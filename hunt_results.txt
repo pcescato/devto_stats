@@ -1,0 +1,333 @@
+================================================================================
+🔍 DEV.TO API ENDPOINT HUNTER
+================================================================================
+
+Testing 51 potential endpoints...
+Base URL: https://dev.to
+
+================================================================================
+
+✅ FOUND                   /api/articles/me/all
+  Sample: [
+  {
+    "type_of": "article",
+    "id": 3144468,
+    "title": "Beyond the Linear CV",
+    "description": "This is a submission for the New Year, New You Portfolio Challenge Presented by Google AI          ...",
+    "published": true,
+    "published_at": "2026-01-04T10:46:55.012Z",
+    "slug": "bey
+
+✅ FOUND                   /api/readinglist
+  Sample: [
+  {
+    "type_of": "readinglist",
+    "id": 19653868,
+    "status": "valid",
+    "created_at": "2026-01-08T14:06:32Z",
+    "article": {
+      "type_of": "article",
+      "id": 3142740,
+      "title": "When React Starts Acting Like jQuery (and You Can Totally Tell \ud83d\ude05)",
+      "description
+
+✅ FOUND                   /api/followers/users
+  Sample: [
+  {
+    "type_of": "user_follower",
+    "id": 77801014,
+    "created_at": "2026-01-08T16:46:00Z",
+    "user_id": 3700936,
+    "name": "Asfik hasan",
+    "path": "/asfik269",
+    "username": "asfik269",
+    "profile_image": "https://media2.dev.to/dynamic/image/width=60,height=60,fit=cover,gravity=a
+
+✅ FOUND                   /api/follows/tags
+  Sample: [
+  {
+    "id": 307,
+    "name": "ai",
+    "points": 4.376421184743732
+  },
+  {
+    "id": 228,
+    "name": "opensource",
+    "points": 2.4289079619306353
+  }
+]
+
+✅ FOUND                   /api/analytics/historical
+  Sample: {
+  "2026-01-01": {
+    "comments": {
+      "total": 0
+    },
+    "follows": {
+      "total": 3
+    },
+    "reactions": {
+      "total": 0,
+      "like": 0,
+      "readinglist": 0,
+      "unicorn": 0
+    },
+    "page_views": {
+      "total": 0,
+      "average_read_time_in_seconds": 0,
+      "total_r
+
+❌ Not found               /api/dashboard
+
+✅ FOUND (not JSON)        /api/dashboard/stats
+  Sample: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    
+      <meta name="last-updated" content="2026-01-08 17:00:30 UTC">
+      <meta name="user-signed-in" conte
+
+❌ Not found               /api/dashboard/analytics
+
+❌ Not found               /api/stats
+
+❌ Not found               /api/stats/summary
+
+❌ Not found               /api/users/me/stats
+
+❌ Not found               /api/users/me/analytics
+
+❌ Not found               /api/users/me/dashboard
+
+❌ Not found               /api/articles/3144468/analytics
+
+❌ Not found               /api/articles/3144468/stats
+
+❌ Not found               /api/articles/3144468/traffic_sources
+
+❌ Not found               /api/analytics
+
+❌ Not found               /api/analytics/summary
+
+❌ Not found               /api/analytics/articles
+
+❌ Not found               /api/analytics/followers
+
+❌ Not found               /api/analytics/engagement
+
+❌ Not found               /api/analytics/traffic
+
+❌ Not found               /api/reading_stats
+
+❌ Not found               /api/users/me/reading_stats
+
+❌ Not found               /api/users/me/reading_history
+
+❌ Not found               /api/activity
+
+✅ FOUND (not JSON)        /api/activity/stats
+  Sample: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    
+      <meta name="last-updated" content="2026-01-08 17:00:42 UTC">
+      <meta name="user-signed-in" conte
+
+❌ Not found               /api/followers/analytics
+
+❌ Not found               /api/followers/events
+
+❌ Not found               /api/followers/recent
+
+✅ FOUND (not JSON)        /api/followers/stats
+  Sample: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    
+      <meta name="last-updated" content="2026-01-08 17:00:45 UTC">
+      <meta name="user-signed-in" conte
+
+❌ Not found               /api/reactions
+
+❌ Not found               /api/reactions/analytics
+
+✅ FOUND (not JSON)        /api/reactions/stats
+  Sample: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    
+      <meta name="last-updated" content="2026-01-08 17:00:47 UTC">
+      <meta name="user-signed-in" conte
+
+❌ Not found               /api/notifications/analytics
+
+✅ FOUND (not JSON)        /api/notifications/stats
+  Sample: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    
+      <meta name="last-updated" content="2026-01-08 17:00:49 UTC">
+      <meta name="user-signed-in" conte
+
+❌ Not found               /api/notifications/unread_count
+
+❌ Not found               /internal_api/analytics
+
+❌ Not found               /internal_api/stats
+
+❌ Not found               /internal_api/dashboard
+
+❌ Not found               /internal_api/users/me/stats
+
+❌ Not found               /dashboard/api/analytics
+
+✅ FOUND (not JSON)        /dashboard/api/stats
+  Sample: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    
+      <meta name="last-updated" content="2026-01-08 17:00:53 UTC">
+      <meta name="user-signed-in" conte
+
+✅ FOUND (not JSON)        /dashboard/analytics
+  Sample: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    
+      <meta name="last-updated" content="2026-01-08 17:00:54 UTC">
+      <meta name="user-signed-in" conte
+
+❌ Not found               /api/profile/analytics
+
+✅ FOUND (not JSON)        /api/profile/stats
+  Sample: <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    
+      <meta name="last-updated" content="2026-01-08 17:00:55 UTC">
+      <meta name="user-signed-in" conte
+
+❌ Not found               /api/organizations/me
+
+❌ Not found               /api/organizations/me/analytics
+
+✅ FOUND                   /api/comments/analytics
+  Sample: {
+  "type_of": "comment",
+  "id_code": "anal",
+  "created_at": "2019-05-13T21:03:39Z",
+  "body_html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\" \"http://www.w3.org/TR/REC-html40/loose.dtd\">\n<html><body>\n<p>\ud83d\udcaf\ud83d\udcaf\ud83d\udcaf</p>\n\n</body></html>\n",
+  "us
+
+❌ Not found               /api/comments/stats
+
+❌ Not found               /api/tags/analytics
+
+================================================================================
+
+📊 SUMMARY
+================================================================================
+Total endpoints tested: 51
+Working endpoints found: 14
+
+✅ WORKING ENDPOINTS:
+  • /api/articles/me/all
+  • /api/readinglist
+  • /api/followers/users
+  • /api/follows/tags
+  • /api/analytics/historical
+  • /api/dashboard/stats
+  • /api/activity/stats
+  • /api/followers/stats
+  • /api/reactions/stats
+  • /api/notifications/stats
+  • /dashboard/api/stats
+  • /dashboard/analytics
+  • /api/profile/stats
+  • /api/comments/analytics
+
+🔥 INTERESTING RESPONSES (showing sample data):
+
+  /api/articles/me/all
+  [
+  {
+    "type_of": "article",
+    "id": 3144468,
+    "title": "Beyond the Linear CV",
+    "description": "This is a submission for the New Year, New You Portfolio Challenge Presented by Google AI   ...
+
+  /api/readinglist
+  [
+  {
+    "type_of": "readinglist",
+    "id": 19653868,
+    "status": "valid",
+    "created_at": "2026-01-08T14:06:32Z",
+    "article": {
+      "type_of": "article",
+      "id": 3142740,
+      "title"...
+
+  /api/followers/users
+  [
+  {
+    "type_of": "user_follower",
+    "id": 77801014,
+    "created_at": "2026-01-08T16:46:00Z",
+    "user_id": 3700936,
+    "name": "Asfik hasan",
+    "path": "/asfik269",
+    "username": "asfik26...
+
+  /api/follows/tags
+  [
+  {
+    "id": 307,
+    "name": "ai",
+    "points": 4.376421184743732
+  },
+  {
+    "id": 228,
+    "name": "opensource",
+    "points": 2.4289079619306353
+  }
+]...
+
+  /api/analytics/historical
+  {
+  "2026-01-01": {
+    "comments": {
+      "total": 0
+    },
+    "follows": {
+      "total": 3
+    },
+    "reactions": {
+      "total": 0,
+      "like": 0,
+      "readinglist": 0,
+      "unicorn": 0
+...
+
+================================================================================
+
+💡 TIP: Try inspecting your DEV.to dashboard with Browser DevTools (F12)
+   to see which endpoints the UI actually uses!
+
+================================================================================

@@ -1,0 +1,120 @@
+
+================================================================================
+🔍 DIAGNOSTIC DES INCOHÉRENCES
+================================================================================
+
+1️⃣  VÉRIFICATION: Réactions - Mélange de périodes
+--------------------------------------------------------------------------------
+⚠️  5 articles avec des réactions manquantes dans daily_analytics
+
+Article ID   Title                                    Lifetime   90-day     Missing   
+--------------------------------------------------------------------------------
+2969205      Actually Agile: Against Performance T... 52         9          43        
+3068161      Respiration                              30         14         16        
+3144468      Beyond the Linear CV                     27         13         14        
+2994223      Efficient Laziness at Scale: The Agil... 11         4          7         
+2915031      Building with AI without losing contr... 11         5          6         
+
+2️⃣  VÉRIFICATION: Calculs de trafic (views/week)
+--------------------------------------------------------------------------------
+⚠️  5 articles avec calculs faussés (âge > 90 jours)
+
+💡 Ces articles ont des vues Google calculées sur leur âge total,
+   mais les données ne couvrent que 90 jours max.
+
+   • I Replaced My $6/Month VPS with a 2017 Laptop and 
+     Age: 142 jours
+     Données disponibles: ~90 jours max
+     Impact: views/week sous-estimées de 1.6x
+
+   • WordPress vs Hugo: When Reality Challenges the Spe
+     Age: 135 jours
+     Données disponibles: ~90 jours max
+     Impact: views/week sous-estimées de 1.5x
+
+   • AI-Assisted Development
+     Age: 128 jours
+     Données disponibles: ~90 jours max
+     Impact: views/week sous-estimées de 1.4x
+
+3️⃣  VÉRIFICATION: Formats de dates
+--------------------------------------------------------------------------------
+⚠️  Formats de dates inconsistents:
+   • article_metrics      → SQL datetime
+   • daily_analytics      → ISO with T
+   • follower_events      → SQL datetime
+   • comments             → ISO with T
+
+================================================================================
+Total issues found: 9
+================================================================================
+
+================================================================================
+🔧 RECOMMANDATIONS DE CORRECTION
+================================================================================
+
+📋 ACTIONS RECOMMANDÉES:
+
+1. Réactions manquantes (5 articles):
+   ✅ SOLUTION:
+      - Modifier quality_analytics.py ligne 112-130
+      - Utiliser UNIQUEMENT am.reactions (lifetime)
+      - OU documenter clairement que breakdown = 90j seulement
+
+   Code corrigé:
+
+            cursor.execute("""
+                SELECT 
+                    am.article_id,
+                    am.title,
+                    MAX(am.reactions) as total_reactions,  -- Lifetime (correct)
+                    -- Breakdown disponible seulement sur 90j (optionnel)
+                    MAX(da.reactions_like) as reactions_like_90d,
+                    MAX(da.reactions_unicorn) as reactions_unicorn_90d,
+                    MAX(da.reactions_readinglist) as reactions_bookmark_90d
+                FROM article_metrics am
+                LEFT JOIN daily_analytics da ON am.article_id = da.article_id
+                WHERE am.reactions > 5
+                GROUP BY am.article_id
+                ORDER BY total_reactions DESC
+                LIMIT 10
+            """)
+            
+
+2. Calculs de trafic faussés (3 articles):
+   ✅ SOLUTION:
+      - Modifier traffic_analytics.py ligne 177-186
+      - Calculer views/week sur la période de données (90j max)
+
+   Code corrigé:
+
+            # Au lieu de:
+            # views_per_week = (google_views / age_days) * 7
+            
+            # Utiliser:
+            data_period_days = min(90, age_days)  # Données max sur 90 jours
+            views_per_week = (google_views / data_period_days) * 7
+            
+            # Ou mieux: compter les jours réels de données
+            cursor.execute("""
+                SELECT 
+                    COUNT(DISTINCT date) as actual_days_with_data
+                FROM daily_analytics
+                WHERE article_id = ?
+            """, (article_id,))
+            actual_days = cursor.fetchone()['actual_days_with_data']
+            views_per_week = (google_views / actual_days) * 7 if actual_days > 0 else 0
+            
+
+3. Formats de dates inconsistants:
+   ✅ SOLUTION:
+      - Standardiser avec datetime.fromisoformat()
+      - Créer une fonction utilitaire:
+
+            def parse_api_datetime(date_str: str) -> datetime:
+                """Parse datetime from API (handles Z suffix and T separator)"""
+                if not date_str:
+                    return None
+                # API returns ISO format with Z suffix
+                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            
