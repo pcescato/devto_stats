@@ -185,7 +185,6 @@ Avec les données historisées, vous pouvez répondre à :
 ## 💡 Cas d'usage réels
 
 ### Cas 1 : Article viral
-> "Beyond the Linear CV" - 1114 vues en 2,5 jours
 
 Avec tracking historique, vous pouvez :
 - Voir la courbe de croissance heure par heure
@@ -194,7 +193,6 @@ Avec tracking historique, vous pouvez :
 - Mesurer la "longue traîne" après le pic
 
 ### Cas 2 : Followers growth
-> +210 followers en 2,5 jours
 
 Questions répondues :
 - Combien le jour 1 ? Jour 2 ? Jour 3 ?
@@ -355,11 +353,6 @@ Idées ? Bugs ? Améliorations ?
 ## 📄 License
 
 MIT License - Utilisez comme vous voulez !
-
-## 🙏 Remerciements
-
-Inspiré par le besoin de ne pas perdre les données de croissance de
-"Beyond the Linear CV" (+210 followers en 2,5 jours).
 
 ---
 
