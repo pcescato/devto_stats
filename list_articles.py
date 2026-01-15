@@ -19,7 +19,7 @@ class ArticleLister:
             self.conn = sqlite3.connect(self.db_path)
             self.conn.row_factory = sqlite3.Row
     
-    def list_all_articles(self, sort_by: str = "published", limit: int = None):
+    def list_all_articles(self, sort_by: str = "published", limit: int = None, include_deleted: bool = False):
         """List all articles with IDs"""
         self.connect()
         cursor = self.conn.cursor()
@@ -34,6 +34,9 @@ class ArticleLister:
             "id": "article_id ASC"
         }.get(sort_by, "published_at DESC")
         
+        # Filter deleted articles unless explicitly requested
+        deleted_filter = "" if include_deleted else "AND (is_deleted IS NULL OR is_deleted = 0)"
+        
         query = f"""
             SELECT 
                 article_id,
@@ -41,9 +44,11 @@ class ArticleLister:
                 published_at,
                 MAX(views) as views,
                 MAX(reactions) as reactions,
-                MAX(comments) as comments
+                MAX(comments) as comments,
+                MAX(is_deleted) as is_deleted
             FROM article_metrics
             WHERE published_at IS NOT NULL
+            {deleted_filter}
             GROUP BY article_id
             ORDER BY {order_by}
         """
@@ -59,8 +64,10 @@ class ArticleLister:
             print("Run: python3 devto_tracker.py --api-key YOUR_KEY --collect")
             return
         
+        status_msg = "including deleted" if include_deleted else "active only"
+        
         print("\n" + "="*100)
-        print(f"📚 YOUR ARTICLES (Total: {len(articles)})")
+        print(f"📚 YOUR ARTICLES (Total: {len(articles)}, {status_msg})")
         print("="*100)
         print(f"\n{'ID':<10} {'Title':<50} {'Published':<12} {'Views':>8} {'👍':>6} {'💬':>6}")
         print("-"*100)
@@ -69,8 +76,15 @@ class ArticleLister:
             title = article['title'][:47] + "..." if len(article['title']) > 50 else article['title']
             pub_date = article['published_at'][:10] if article['published_at'] else 'N/A'
             
+            # Mark deleted articles
+            deleted_marker = " 🗑️" if article.get('is_deleted') else ""
+            title = title + deleted_marker
+            
             print(f"{article['article_id']:<10} {title:<50} {pub_date:<12} "
                   f"{article['views']:>8} {article['reactions']:>6} {article['comments']:>6}")
+        
+        if not include_deleted:
+            print("\n💡 To see deleted articles: python3 list_articles.py --include-deleted")
         
         print("\n💡 Use article ID with other commands:")
         print("   python3 quality_analytics.py --article <ID>")
@@ -316,6 +330,7 @@ def main():
     parser.add_argument('--search', type=str, metavar='TERM', help='Search articles by title')
     parser.add_argument('--id', type=int, metavar='ID', help='Show details for specific article')
     parser.add_argument('--top', action='store_true', help='Show top performers')
+    parser.add_argument('--include-deleted', action='store_true', help='Include deleted articles in results')
     
     args = parser.parse_args()
     
@@ -329,7 +344,7 @@ def main():
         lister.list_top_performers()
     else:
         # Default: list all articles
-        lister.list_all_articles(sort_by=args.sort, limit=args.limit)
+        lister.list_all_articles(sort_by=args.sort, limit=args.limit, include_deleted=args.include_deleted)
     
     lister.close()
 
