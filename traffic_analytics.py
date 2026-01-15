@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 """
-Traffic Analytics - Analyze referrers and traffic sources
-Based on data from /api/analytics/referrers endpoint (UNDOCUMENTED!)
+Quality Analytics - Analyze read time, reaction breakdown, and engagement quality
+Based on data from /api/analytics/historical endpoint
 
 ⚠️ IMPORTANT DATA PERIOD NOTES:
-- Referrer data covers last 90 days only
-- For articles older than 90 days, traffic metrics are incomplete
-- Views/week calculations adjusted to use actual data period (not article age)
+- Read time data: Last 90 days only (from daily_analytics)
+- Reaction breakdown (like/unicorn/bookmark): Last 90 days only (from daily_analytics)
+- Total reactions/comments: Lifetime (from article_metrics)
+- For articles older than 90 days, breakdown will be incomplete
 """
 
 import sqlite3
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 
-class TrafficAnalytics:
+class QualityAnalytics:
     def __init__(self, db_path: str = "devto_metrics.db"):
         self.db_path = db_path
         self.conn = None
@@ -24,126 +25,223 @@ class TrafficAnalytics:
             self.conn = sqlite3.connect(self.db_path)
             self.conn.row_factory = sqlite3.Row
     
-    def show_traffic_dashboard(self):
-        """Show complete traffic sources dashboard"""
+    def show_quality_dashboard(self):
+        """Show complete quality metrics dashboard"""
         self.connect()
         
         print("\n" + "="*100)
-        print("🌐 TRAFFIC SOURCES DASHBOARD")
+        print("📊 QUALITY ANALYTICS DASHBOARD")
         print("="*100)
         
-        self.show_top_referrers()
-        self.show_article_traffic_breakdown()
-        self.show_seo_performance()
-        self.show_social_performance()
+        self.show_read_time_analysis()
+        self.show_reaction_breakdown()
+        self.show_long_tail_champions()
+        self.show_quality_scores()
         
         print("\n" + "="*100)
     
-    def show_top_referrers(self):
-        """Show top traffic sources across all articles"""
+    def show_read_time_analysis(self):
+        """Analyze average read times per article"""
         cursor = self.conn.cursor()
-        
-        cursor.execute("SELECT MAX(collected_at) as latest_collection FROM referrers")
-        latest = cursor.fetchone()['latest_collection']
-        
-        if not latest:
-            print("\n❌ No referrer data found.")
-            return
         
         cursor.execute("""
             SELECT 
-                COALESCE(domain, 'Direct / Bookmarks') as source,
-                SUM(count) as total_views,
-                COUNT(DISTINCT article_id) as articles_count
-            FROM referrers
-            WHERE collected_at = ?
-            GROUP BY domain
-            ORDER BY total_views DESC
-        """, (latest,))
-        
-        referrers = cursor.fetchall()
-        total_views = sum(r['total_views'] for r in referrers)
-        
-        print(f"\n\n🌐 TOP TRAFFIC SOURCES (Latest: {latest[:10]})")
-        print("-" * 100)
-        print(f"{'Source':<40} {'Views':>12} {'% of Total':>12} {'Articles':>12}")
-        print("-" * 100)
-        
-        for ref in referrers:
-            source = (ref['source'][:37] + "...") if len(ref['source']) > 40 else ref['source']
-            percentage = (ref['total_views'] / total_views * 100) if total_views > 0 else 0
-            print(f"{source:<40} {ref['total_views']:>12} {percentage:>11.1f}% {ref['articles_count']:>12}")
-
-    def show_seo_performance(self):
-        """Analyze SEO performance (Google traffic) with fixed velocity calculation"""
-        cursor = self.conn.cursor()
-        
-        cursor.execute("SELECT MAX(collected_at) as latest_collection FROM referrers")
-        latest = cursor.fetchone()['latest_collection']
-        
-        # Correction : On récupère le nombre de jours réels de données via daily_analytics
-        cursor.execute("""
-            SELECT 
-                r.article_id,
+                da.article_id,
                 am.title,
-                SUM(r.count) as google_views,
+                am.reading_time_minutes,
                 am.published_at,
-                julianday('now') - julianday(am.published_at) as article_age_days,
-                (
-                    SELECT COUNT(DISTINCT date)
-                    FROM daily_analytics da
-                    WHERE da.article_id = r.article_id
-                ) as actual_days_with_data
-            FROM referrers r
-            JOIN (
-                SELECT DISTINCT article_id, title, published_at
-                FROM article_metrics
-                WHERE published_at IS NOT NULL
-            ) am ON r.article_id = am.article_id
-            WHERE r.collected_at = ?
-            AND r.domain LIKE '%google%'
-            GROUP BY r.article_id
-            HAVING google_views > 5
-            ORDER BY google_views DESC
+                julianday('now') - julianday(am.published_at) as age_days,
+                AVG(da.average_read_time_seconds) as avg_read_seconds,
+                MAX(da.page_views) as total_views,
+                MAX(da.total_read_time_seconds) as total_read_seconds,
+                COUNT(DISTINCT da.date) as days_with_data
+            FROM daily_analytics da
+            JOIN article_metrics am ON da.article_id = am.article_id
+            WHERE da.page_views > 0
+            GROUP BY da.article_id
+            HAVING total_views > 20
+            ORDER BY avg_read_seconds DESC
             LIMIT 10
-        """, (latest,))
+        """)
         
         articles = cursor.fetchall()
         
-        print(f"\n\n🔍 SEO PERFORMANCE (Articles with Google Traffic)")
+        print(f"\n\n📖 READ TIME ANALYSIS (Top 10)")
+        print("-" * 100)
+        print(f"{'Title':<50} {'Length':>8} {'Avg Read':>10} {'Completion':>12} {'Total Hours':>12}")
+        print("-" * 100)
+        
+        for article in articles:
+            title = (article['title'][:47] + "...") if len(article['title']) > 50 else article['title']
+            length_seconds = (article['reading_time_minutes'] or 0) * 60
+            avg_read = article['avg_read_seconds'] or 0
+            
+            completion = min(100, (avg_read / length_seconds) * 100) if length_seconds > 0 else 0
+            total_hours = (article['total_read_seconds'] or 0) / 3600
+            
+            print(f"{title:<50} {article['reading_time_minutes']:>7}m "
+                  f"{int(avg_read):>8}s {completion:>10.1f}% {total_hours:>11.1f}h")
+        
+        print("\n💡 Note: Read time data covers last 90 days only")
+    
+    def show_reaction_breakdown(self):
+        """Analyze types of reactions with fixed lifetime/breakdown consistency"""
+        cursor = self.conn.cursor()
+        
+        # On utilise MAX(am.reactions) comme source de vérité absolue (Lifetime)
+        # Et on fait la somme des colonnes incrémentales de daily_analytics pour le détail
+        cursor.execute("""
+            SELECT 
+                am.article_id,
+                am.title,
+                am.published_at,
+                julianday('now') - julianday(am.published_at) as age_days,
+                MAX(am.reactions) as total_reactions_lifetime,
+                (
+                    SELECT SUM(reactions_like)
+                    FROM daily_analytics da2
+                    WHERE da2.article_id = am.article_id
+                    AND da2.date >= date(am.published_at)
+                ) as likes_sum,
+                (
+                    SELECT SUM(reactions_unicorn)
+                    FROM daily_analytics da2
+                    WHERE da2.article_id = am.article_id
+                    AND da2.date >= date(am.published_at)
+                ) as unicorns_sum,
+                (
+                    SELECT SUM(reactions_readinglist)
+                    FROM daily_analytics da2
+                    WHERE da2.article_id = am.article_id
+                    AND da2.date >= date(am.published_at)
+                ) as bookmarks_sum
+            FROM article_metrics am
+            WHERE am.reactions > 5
+            GROUP BY am.article_id
+            ORDER BY total_reactions_lifetime DESC
+            LIMIT 10
+        """)
+        
+        articles = cursor.fetchall()
+        
+        print(f"\n\n❤️ REACTION BREAKDOWN (Top 10)")
         print("-" * 120)
-        print(f"{'Article':<40} {'Age':>8} {'Data':>6} {'Google':>10} {'Views/Week':>12} {'Note':<15}")
+        print(f"{'Title':<45} {'Age':>6} {'Lifetime':>10} │ {'Likes':>7} {'🦄':>5} {'📖':>5} {'Sum':>8} {'Gap':>5}")
         print("-" * 120)
         
         for article in articles:
-            title = (article['title'][:37] + "...") if len(article['title']) > 40 else article['title']
-            age = int(article['article_age_days']) if article['article_age_days'] else 0
+            title = (article['title'][:42] + "...") if len(article['title']) > 45 else article['title']
+            age_days = int(article['age_days']) if article['age_days'] else 0
             
-            # Pragmatique : Si l'article a plus de 90 jours, on divise par 90 (la fenêtre de l'API)
-            # Sinon on divise par le nombre de jours réels où on a de la donnée
-            data_days = article['actual_days_with_data'] or 1
-            data_period_days = min(90, data_days)
-            views_per_week = (article['google_views'] / data_period_days) * 7
+            likes = article['likes_sum'] or 0
+            unicorns = article['unicorns_sum'] or 0
+            bookmarks = article['bookmarks_sum'] or 0
+            breakdown_sum = likes + unicorns + bookmarks
             
-            note = "⚠️ >90d (Recent)" if age > 90 else ""
+            # Gap : Différence entre le total réel et la somme du détail (souvent causé par les 90j)
+            gap = article['total_reactions_lifetime'] - breakdown_sum
+            gap_str = f"{gap:+d}" if gap != 0 else "="
             
-            print(f"{title:<40} {age:>7}d {data_days:>5}d {article['google_views']:>10} "
-                  f"{views_per_week:>11.1f} {note:<15}")
+            print(f"{title:<45} {age_days:>5}d {article['total_reactions_lifetime']:>10} │ "
+                  f"{likes:>7} {unicorns:>5} {bookmarks:>5} {breakdown_sum:>8} {gap_str:>5}")
+        
+        print("-" * 120)
+        print("💡 Gap > 0 : Réactions anciennes (>90j) dont le type (Like/Unicorn) est perdu.")
+        print("   Gap < 0 : Réactions retirées par les utilisateurs (historique conservé vs état actuel).")
 
-    # ... (les autres méthodes comme show_social_performance restent identiques)
+    def show_quality_scores(self):
+        """Calculate quality scores based on consistent 90-day window"""
+        cursor = self.conn.cursor()
+        
+        cursor.execute("""
+            SELECT 
+                am.article_id,
+                am.title,
+                am.reading_time_minutes,
+                AVG(da.average_read_time_seconds) as avg_read_seconds,
+                MAX(da.page_views) as views_90d,
+                (SELECT SUM(reactions_total) FROM daily_analytics da2 WHERE da2.article_id = am.article_id) as reactions_90d,
+                (SELECT SUM(comments_total) FROM daily_analytics da2 WHERE da2.article_id = am.article_id) as comments_90d
+            FROM article_metrics am
+            JOIN daily_analytics da ON am.article_id = da.article_id
+            GROUP BY am.article_id
+            HAVING views_90d > 20
+        """)
+        
+        articles = cursor.fetchall()
+        scored = []
+        
+        for article in articles:
+            length_sec = (article['reading_time_minutes'] or 5) * 60
+            avg_read = article['avg_read_seconds'] or 0
+            completion = min(100, (avg_read / length_sec) * 100) if length_sec > 0 else 0
+            
+            # Engagement sur les derniers 90 jours
+            engagement = ((article['reactions_90d'] + article['comments_90d']) / article['views_90d']) * 100
+            
+            # Score pondéré : 70% lecture, 30% engagement (capé à 20% d'engagement)
+            score = (completion * 0.7) + (min(engagement, 20) * 1.5)
+            scored.append({'title': article['title'], 'score': score, 'completion': completion, 'engagement': engagement})
+            
+        scored.sort(key=lambda x: x['score'], reverse=True)
+        
+        print(f"\n\n⭐ QUALITY SCORES (Performance sur 90 jours)")
+        print("-" * 100)
+        print(f"{'Title':<50} {'Quality':>9} {'Read %':>8} {'Engage %':>10}")
+        print("-" * 100)
+        
+        for art in scored[:10]:
+            title = (art['title'][:47] + "...") if len(art['title']) > 50 else art['title']
+            print(f"{title:<50} {art['score']:>8.1f} {art['completion']:>7.1f}% {art['engagement']:>9.1f}%")
+
+    def show_long_tail_champions(self):
+        """Articles with strong recent performance despite being old"""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT am.title, 
+                   julianday('now') - julianday(am.published_at) as age,
+                   SUM(CASE WHEN da.date >= date('now', '-30 days') THEN da.page_views ELSE 0 END) as recent
+            FROM daily_analytics da
+            JOIN article_metrics am ON da.article_id = am.article_id
+            WHERE am.published_at < date('now', '-30 days')
+            GROUP BY am.article_id
+            HAVING recent > 50
+            ORDER BY recent DESC LIMIT 10
+        """)
+        
+        print(f"\n\n🌟 LONG-TAIL CHAMPIONS (Vues récentes sur vieux articles)")
+        print("-" * 80)
+        for row in cursor.fetchall():
+            title = (row['title'][:50] + "...") if len(row['title']) > 53 else row['title']
+            print(f"{title:<53} {int(row['age']):>5}d {row['recent']:>10} views/30d")
+
+    def analyze_article_daily(self, article_id: int):
+        """Show daily breakdown for a specific article"""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT title FROM article_metrics WHERE article_id = ?", (article_id,))
+        row = cursor.fetchone()
+        if not row: return
+
+        print(f"\n📊 DAILY BREAKDOWN: {row['title']}")
+        cursor.execute("""
+            SELECT date, page_views, average_read_time_seconds, reactions_total 
+            FROM daily_analytics WHERE article_id = ? ORDER BY date DESC LIMIT 14
+        """, (article_id,))
+        print(f"{'Date':<12} {'Views':>7} {'Read(s)':>9} {'Reactions':>10}")
+        for d in cursor.fetchall():
+            print(f"{d['date']:<12} {d['page_views']:>7} {d['average_read_time_seconds']:>9} {d['reactions_total']:>10}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Traffic Sources Analytics Dashboard")
-    parser.add_argument('--db', default='devto_metrics.db', help='Database path')
-    parser.add_argument('--full', action='store_true', help='Show full dashboard')
-    parser.add_argument('--seo', action='store_true', help='SEO performance')
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--db', default='devto_metrics.db')
+    parser.add_argument('--full', action='store_true')
+    parser.add_argument('--article', type=int)
     args = parser.parse_args()
-    analytics = TrafficAnalytics(args.db)
     
-    if args.seo or args.full:
-        analytics.connect()
-        analytics.show_seo_performance()
+    qa = QualityAnalytics(args.db)
+    qa.connect()
+    if args.article: qa.analyze_article_daily(args.article)
+    else: qa.show_quality_dashboard()
 
 if __name__ == "__main__":
     main()
