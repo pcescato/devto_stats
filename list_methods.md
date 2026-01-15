@@ -182,6 +182,46 @@ python3 comment_analyzer.py --db custom.db --engaged-readers
 
 ## 🔧 Utility Scripts
 
+### `list_articles.py`
+Simple utility to list all your articles with their IDs.
+
+```bash
+# List all articles (default: sorted by publication date)
+python3 list_articles.py
+python3 list_articles.py --all
+
+# Sort articles
+python3 list_articles.py --sort views         # By views
+python3 list_articles.py --sort reactions     # By reactions
+python3 list_articles.py --sort comments      # By comments
+python3 list_articles.py --sort title         # By title (A-Z)
+python3 list_articles.py --sort id            # By ID
+
+# Limit results
+python3 list_articles.py --limit 10           # Show only 10 articles
+
+# Search articles by title
+python3 list_articles.py --search "python"
+python3 list_articles.py --search "react"
+
+# Show details for specific article
+python3 list_articles.py --id 3144468
+
+# Show top performers
+python3 list_articles.py --top
+
+# Custom database
+python3 list_articles.py --db custom.db --all
+```
+
+**Perfect for:**
+- Finding article IDs quickly
+- Seeing all your content at a glance
+- Searching by title
+- Identifying top performers
+
+---
+
 ### `quick_check.py`
 Inspect database schema and sample data.
 
@@ -226,6 +266,21 @@ python3 endpoint_hunter.py YOUR_API_KEY
 ---
 
 ## 🎯 Common Workflows
+
+### 🆕 Quick Start: Find Your Article IDs
+```bash
+# List all articles with IDs
+python3 list_articles.py
+
+# Search for a specific article
+python3 list_articles.py --search "python"
+
+# Get detailed info about an article
+python3 list_articles.py --id 3144468
+
+# Show your top performers
+python3 list_articles.py --top
+```
 
 ### Daily Collection Routine
 ```bash
@@ -320,6 +375,7 @@ Use responsibly and be mindful of rate limits.
 | Script | Purpose | Key Commands |
 |--------|---------|--------------|
 | `dashboard.py` | Overview | `python3 dashboard.py` |
+| `list_articles.py` | **Find IDs** | `--all`, `--search "term"`, `--id ID`, `--top` |
 | `devto_tracker.py` | Collection | `--collect`, `--collect-daily`, `--collect-referrers` |
 | `quality_analytics.py` | Quality | `--read-time`, `--reactions`, `--quality`, `--article ID` |
 | `traffic_analytics.py` | Traffic | `--referrers`, `--seo`, `--social`, `--article ID` |
