@@ -215,6 +215,20 @@ MIT License.
 
 ---
 
+🧭 Inspiration & Related Tools
+
+This project was inspired in part by the work of the DEV.to community, especially:
+
+[devto-analytics-pro](https://github.com/GnomeMan4201/devto-analytics-pro) (by [GnomeMan4201](https://github.com/GnomeMan4201)) — a solid foundation for visualizing DEV.to metrics and understanding overall activity.
+
+[devto-bot-audit](https://github.com/GnomeMan4201/devto-bot-audit) (by [GnomeMan4201](https://github.com/GnomeMan4201)) — a clever tool for identifying suspicious follower patterns and highlighting potential bot activity.
+
+These tools helped shape the early direction of this tracker. However, this project goes further by focusing on historical data, automated collection, deep analytics, and a design closer to an ETL pipeline mixed with a lightweight CRM.
+
+It aims to complement the existing ecosystem rather than replace it.
+
+---
+
 ### 🚧 Status
 
 **Still in progress. Check `TODO.md` for the roadmap toward the Community version.**
