@@ -18,8 +18,20 @@ devto-metrics-tracker/
 ├── devto_tracker.py          # Script principal de collecte
 ├── comment_analyzer.py       # Analyse approfondie des commentaires
 ├── setup_automation.sh       # Configuration automatique
-├── dev.py                    # Votre script analytics original
-└── devto_metrics.db          # Base de données SQLite (générée)
+├── advanced_analytics.py     # Analyse avancée des métriques
+├── anrety.py                 # Outil d'analyse des articles
+├── checkcoverage.py          # Vérification de la couverture des données
+├── checkincremental.py       # Vérification des données incrémentales
+├── cleanup_articles.py       # Nettoyage des articles supprimés
+├── cli_to_svg.py            # Conversion CLI en SVG
+├── dashboard.py              # Tableau de bord des métriques
+├── diagnose.py               # Diagnostic des métriques
+├── fix.py                    # Script de correction des erreurs
+├── list_articles.py          # Liste des articles collectés
+├── nlp_analyzer.py          # Analyse NLP des commentaires
+├── quality_analytics.py      # Analyse de la qualité des articles
+├── quick_check.py            # Vérification rapide des métriques
+├── traffic_analytics.py      # Analyse du trafic
 ```
 
 ## 🚀 Installation rapide
