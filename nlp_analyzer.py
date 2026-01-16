@@ -1,91 +1,93 @@
+import os
 import sqlite3
 import spacy
 from bs4 import BeautifulSoup
 from textblob import TextBlob
-from collections import Counter
-import sys
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class NLPAnalyzer:
     def __init__(self, db_path="devto_metrics.db"):
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
         self.author_id = "pascal_cescato_692b7a8a20"
+        self._setup_db()
+        
         try:
             self.nlp = spacy.load("en_core_web_sm")
         except:
-            print("Erreur: Modèle spaCy manquant.")
-            sys.exit(1)
+            print("❌ Erreur: Modèle spaCy 'en_core_web_sm' introuvable.")
+            exit(1)
+
+    def _setup_db(self):
+        """Crée la table des résultats si elle n'existe pas"""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS comment_insights (
+                comment_id TEXT PRIMARY KEY,
+                sentiment_score REAL,
+                mood TEXT,
+                analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (comment_id) REFERENCES comments (comment_id)
+            )
+        """)
+        self.conn.commit()
 
     def clean_text(self, html):
         if not html: return ""
         soup = BeautifulSoup(html, "html.parser")
-        # On vire le code pour ne pas fausser l'analyse sémantique
         for code in soup.find_all(['code', 'pre']):
             code.decompose()
-        return soup.get_text(separator=' ')
-    
-    def is_spam(self, text):
-        """Détecte les patterns de spam courants sur DEV.to"""
-        spam_keywords = [
-            'investigator', 'investigating', 'hack', 'whatsapp', 
-            'gmail.com', 'privateinvestigators', 'spouse', 'cheating'
-        ]
-        text_lower = text.lower()
-        # Si un mot de la blacklist est présent, c'est du spam
-        if any(word in text_lower for word in spam_keywords):
-            return True
-        # Si le commentaire contient une adresse mail (souvent du spam sur DEV.to)
-        if "@" in text_lower and ".com" in text_lower:
-            return True
-        return False
+        return soup.get_text(separator=' ').strip()
 
+    def is_spam(self, text):
+        spam_keywords = ['investigator', 'hack', 'whatsapp', 'spouse', 'cheating']
+        t = text.lower()
+        return any(k in t for k in spam_keywords) or ("@" in t and ".com" in t)
 
     def run(self):
         cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT article_title, body_html 
-            FROM comments 
-            WHERE author_username != ?
-        """, (self.author_id,))
+        
+        # Sélection des commentaires non analysés
+        query = """
+            SELECT c.comment_id, c.article_title, c.body_html 
+            FROM comments c
+            LEFT JOIN comment_insights i ON c.comment_id = i.comment_id
+            WHERE i.comment_id IS NULL AND c.author_username != ?
+        """
+        cursor.execute(query, (self.author_id,))
         rows = cursor.fetchall()
 
-        by_article = {}
+        if not rows:
+            print("☕ Tout est à jour. Aucune nouvelle analyse nécessaire.")
+            return
+
+        print(f"🧠 Analyse de {len(rows)} nouveaux commentaires...")
+
         for row in rows:
-            title = row['article_title']
             text = self.clean_text(row['body_html'])
-            
-            # Filtre anti-spam basique : on ignore les caractères non-latins (comme ton spam iranien)
-            text = self.clean_text(row['body_html'])
-            if self.is_spam(text):
-                continue
-            
-            if text and any(ord(c) > 127 for c in text) and "ع" in text: 
-                continue
+            if text and not self.is_spam(text):
+                score = TextBlob(text).sentiment.polarity
+                mood = "🌟 Positif" if score > 0.15 else "😟 Négatif" if score < -0.1 else "😐 Neutre"
+                
+                cursor.execute("""
+                    INSERT INTO comment_insights (comment_id, sentiment_score, mood)
+                    VALUES (?, ?, ?)
+                """, (row['comment_id'], score, mood))
+        
+        self.conn.commit()
+        print("✅ Table comment_insights mise à jour.")
 
-            if text and len(text.split()) > 3:
-                if title not in by_article: by_article[title] = []
-                by_article[title].append(text)
+        # Affichage d'un petit résumé global pour le plaisir
+        self.show_stats()
 
-        print(f"\n🧠 INSIGHTS SÉMANTIQUES ({len(by_article)} Articles)")
-        print("="*100)
-
-        for title, texts in by_article.items():
-            full_text = " ".join(texts)
-            doc = self.nlp(full_text)
-            
-            sentiment = TextBlob(full_text).sentiment.polarity
-            
-            # Extraction des noms porteurs de sens
-            keywords = [t.text.lower() for t in doc 
-                        if not t.is_stop and t.is_alpha and len(t.text) > 3 
-                        and t.pos_ in ['NOUN', 'PROPN', 'ADJ']]
-            
-            common = [f"{w} ({c})" for w, c in Counter(keywords).most_common(6)]
-            mood = "🌟 Positif" if sentiment > 0.15 else "😟 Négatif" if sentiment < -0.1 else "😐 Neutre"
-            
-            print(f"\n📘 {title[:75]}")
-            print(f"   🎭 Sentiment : {mood} ({sentiment:.3f})")
-            print(f"   🔝 Concepts  : {', '.join(common)}")
+    def show_stats(self):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT mood, COUNT(*) as count FROM comment_insights GROUP BY mood")
+        print("\n📊 ÉTAT GLOBAL DU SENTIMENT :")
+        for row in cursor.fetchall():
+            print(f"   {row['mood']} : {row['count']}")
 
 if __name__ == "__main__":
     analyzer = NLPAnalyzer()
