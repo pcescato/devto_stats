@@ -195,25 +195,37 @@ class QualityAnalytics:
             print(f"{title:<50} {art['score']:>8.1f} {art['completion']:>7.1f}% {art['engagement']:>9.1f}%")
 
     def show_long_tail_champions(self):
-        """Articles with strong recent performance despite being old"""
+        """Identifie les articles avec une performance stable (Dédoublonné)"""
         cursor = self.conn.cursor()
+        
+        # On calcule d'abord la somme des vues par article sans les multiplier par les snapshots
         cursor.execute("""
-            SELECT am.title, 
-                   julianday('now') - julianday(am.published_at) as age,
-                   SUM(CASE WHEN da.date >= date('now', '-30 days') THEN da.page_views ELSE 0 END) as recent
-            FROM daily_analytics da
-            JOIN article_metrics am ON da.article_id = am.article_id
+            SELECT 
+                am.title,
+                julianday('now') - julianday(am.published_at) as age_days,
+                stats.views_30d
+            FROM (
+                SELECT article_id, SUM(page_views) as views_30d
+                FROM daily_analytics
+                WHERE date >= date('now', '-30 days')
+                GROUP BY article_id
+            ) stats
+            JOIN (
+                SELECT DISTINCT article_id, title, published_at 
+                FROM article_metrics
+            ) am ON stats.article_id = am.article_id
             WHERE am.published_at < date('now', '-30 days')
-            GROUP BY am.article_id
-            HAVING recent > 50
-            ORDER BY recent DESC LIMIT 10
+            AND stats.views_30d > 20
+            ORDER BY stats.views_30d DESC
+            LIMIT 10
         """)
         
-        print(f"\n\n🌟 LONG-TAIL CHAMPIONS (Vues récentes sur vieux articles)")
+        articles = cursor.fetchall()
+        print(f"\n\n🌟 LONG-TAIL CHAMPIONS (Vues réelles / 30j)")
         print("-" * 80)
-        for row in cursor.fetchall():
-            title = (row['title'][:50] + "...") if len(row['title']) > 53 else row['title']
-            print(f"{title:<53} {int(row['age']):>5}d {row['recent']:>10} views/30d")
+        for art in articles:
+            title = (art['title'][:50] + "...") if len(art['title']) > 53 else art['title']
+            print(f"{title:<53} {int(art['age_days']):>5}d {art['views_30d']:>10} views/30d")
 
     def analyze_article_daily(self, article_id: int):
         """Show daily breakdown for a specific article"""
