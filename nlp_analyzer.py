@@ -42,7 +42,7 @@ class NLPAnalyzer:
         return soup.get_text(separator=' ').strip()
 
     def is_spam(self, text):
-        spam_keywords = ['investigator', 'hack', 'whatsapp', 'spouse', 'cheating']
+        spam_keywords = ['investigator', 'hack', 'whatsapp', 'spouse', 'cheating', 'kasino', 'judi', 'slot', 'kaya', 'putar']
         t = text.lower()
         return any(k in t for k in spam_keywords) or ("@" in t and ".com" in t)
 
