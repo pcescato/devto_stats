@@ -19,23 +19,37 @@ class NLPAnalyzer:
             print("Exécute d'abord : python3 -m spacy download en_core_web_sm")
 
     def sync_markdown_bodies(self):
-        """Récupère le Markdown depuis l'API pour les commentaires qui ne l'ont pas encore"""
+        """Vérifie et récupère les nouveaux commentaires ET le Markdown"""
         cursor = self.conn.cursor()
-        cursor.execute("SELECT comment_id FROM comments WHERE body_markdown IS NULL OR body_markdown = ''")
-        rows = cursor.fetchall()
         
-        if not rows:
-            return
-
-        print(f"🔄 Synchronisation de {len(rows)} commentaires (Markdown)...")
-        for row in rows:
-            c_id = row['comment_id']
-            res = requests.get(f"https://dev.to/api/comments/{c_id}")
+        # 1. On identifie les articles à vérifier
+        cursor.execute("SELECT article_id, title FROM article_metrics GROUP BY article_id")
+        articles = cursor.fetchall()
+        
+        for art in articles:
+            # Récupération de la liste des IDs de commentaires depuis l'API
+            res = requests.get(f"https://dev.to/api/comments?a_id={art['article_id']}")
             if res.status_code == 200:
-                md = res.json().get('body_markdown', '')
-                cursor.execute("UPDATE comments SET body_markdown = ? WHERE comment_id = ?", (md, c_id))
-                self.conn.commit()
-                time.sleep(0.2) # Courtoisie API
+                api_comments = res.json()
+                
+                for c in api_comments:
+                    c_id = c.get('id_code')
+                    # Si le commentaire n'existe pas du tout en base, on le récupère
+                    cursor.execute("SELECT 1 FROM comments WHERE comment_id = ?", (c_id,))
+                    if not cursor.fetchone():
+                        print(f"✨ Nouveau commentaire trouvé sur '{art['title'][:30]}...'")
+                        # Ici on appelle l'endpoint de détail pour avoir le Markdown direct
+                        detail = requests.get(f"https://dev.to/api/comments/{c_id}").json()
+                        
+                        # Insertion complète (plus besoin de passer par le HTML)
+                        cursor.execute("""
+                            INSERT INTO comments (collected_at, comment_id, article_id, article_title, 
+                            author_username, body_markdown, created_at)
+                            VALUES (CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)
+                        """, (c_id, art['article_id'], art['title'], 
+                              detail.get('user', {}).get('username'), 
+                              detail.get('body_markdown'), detail.get('created_at')))
+                        self.conn.commit()
 
     def extract_insights(self):
         """Analyse sémantique des commentaires des lecteurs"""
