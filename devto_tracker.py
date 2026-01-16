@@ -361,28 +361,41 @@ class DevToTracker:
         print(f"💬 Comments: {total_new_comments} new comments saved")
     
     def _save_comment(self, comment: Dict, article_id: int, article_title: str, 
-                     timestamp: datetime, cursor) -> bool:
-        """Save a single comment"""
-        try:
-            cursor.execute("""
-                INSERT OR IGNORE INTO comments 
-                (collected_at, comment_id, article_id, article_title, created_at,
-                 author_username, author_name, body_html, body_length)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                timestamp.isoformat(),  # Convert to string
-                comment.get('id_code'),
-                article_id,
-                article_title,
-                comment.get('created_at'),
-                comment.get('user', {}).get('username'),
-                comment.get('user', {}).get('name'),
-                comment.get('body_html'),
-                len(comment.get('body_html', ''))
-            ))
-            return cursor.rowcount > 0
-        except Exception as e:
+                      timestamp: datetime, cursor) -> bool:
+        """Sauvegarde un commentaire avec son contenu Markdown (pour spaCy)"""
+        comment_id = comment.get('id_code')
+        
+        # On vérifie si on l'a déjà pour ne pas gaspiller d'appels API
+        cursor.execute("SELECT 1 FROM comments WHERE comment_id = ?", (comment_id,))
+        if cursor.fetchone():
             return False
+
+        # Appel supplémentaire pour le Markdown
+        body_markdown = ""
+        try:
+            detail_res = requests.get(f"{self.base_url}/comments/{comment_id}")
+            if detail_res.status_code == 200:
+                body_markdown = detail_res.json().get('body_markdown', '')
+        except:
+            pass
+
+        cursor.execute("""
+            INSERT OR IGNORE INTO comments 
+            (collected_at, comment_id, article_id, article_title, created_at,
+            author_username, author_name, body_html, body_markdown) -- Nouveau champ
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            timestamp.isoformat(),
+            comment_id,
+            article_id,
+            article_title,
+            comment.get('created_at'),
+            comment.get('user', {}).get('username'),
+            comment.get('user', {}).get('name'),
+            comment.get('body_html'),
+            body_markdown # Le texte propre pour spaCy
+        ))
+        return True
     
     def _fetch_and_save_daily_analytics(self, articles: List[Dict], timestamp: datetime):
         """Fetch daily analytics from /api/analytics/historical (undocumented endpoint)"""
