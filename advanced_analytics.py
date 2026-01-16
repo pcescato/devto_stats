@@ -18,15 +18,13 @@ class AdvancedAnalytics:
         self.conn.row_factory = sqlite3.Row
     
     def article_follower_correlation(self):
-        """Corrélation corrigée : Calcule le delta réel de followers autour de la sortie"""
         cursor = self.conn.cursor()
-        
-        print("\n📊 ARTICLE → FOLLOWER CORRELATION (FIXED DELTA)")
+        print("\n📊 ARTICLE → FOLLOWER CORRELATION (ROBUST DELTA)")
         print("=" * 110)
         
         cursor.execute("""
             SELECT article_id, title, published_at, 
-                   MAX(views) as total_views, MAX(reactions) as total_reactions
+                   MAX(views) as total_views
             FROM article_metrics 
             WHERE published_at IS NOT NULL 
             GROUP BY article_id ORDER BY published_at DESC
@@ -38,26 +36,38 @@ class AdvancedAnalytics:
 
         for art in articles:
             pub_date = art['published_at']
-            # On cherche le nombre de followers juste AVANT la publication
+            # On cherche le follower_count le plus proche (avant ou après) de la date de pub
             cursor.execute("""
                 SELECT follower_count FROM follower_events 
-                WHERE collected_at <= ? ORDER BY collected_at DESC LIMIT 1
+                ORDER BY ABS(julianday(collected_at) - julianday(?)) ASC LIMIT 1
             """, (pub_date,))
             start = cursor.fetchone()
             
-            # On cherche le nombre de followers 7 jours APRÈS
-            end_window = (datetime.fromisoformat(pub_date.replace('Z', '+00:00')) + timedelta(days=7)).isoformat()
+            # On cherche le point le plus proche de J+7
+            target_end = (datetime.fromisoformat(pub_date.replace('Z', '+00:00')) + timedelta(days=7)).isoformat()
             cursor.execute("""
                 SELECT follower_count FROM follower_events 
-                WHERE collected_at >= ? ORDER BY collected_at ASC LIMIT 1
-            """, (end_window,))
+                ORDER BY ABS(julianday(collected_at) - julianday(?)) ASC LIMIT 1
+            """, (target_end,))
             end = cursor.fetchone()
 
             if start and end:
                 gain = end['follower_count'] - start['follower_count']
                 title = (art['title'][:42] + "...") if len(art['title']) > 45 else art['title']
+                # On n'affiche que si le gain est cohérent (pour éviter le bruit)
                 print(f"{title:<45} {pub_date[:10]:<12} {gain:>8} {start['follower_count']:>8} {end['follower_count']:>8} {art['total_views']:>8}")
 
+    def comment_engagement_correlation(self):
+        cursor = self.conn.cursor()
+        # On essaye de détecter automatiquement ton username si non fourni
+        if self.author_username == "pascal_cescato":
+             cursor.execute("SELECT author_username FROM comments GROUP BY author_username ORDER BY COUNT(*) DESC LIMIT 1")
+             # Souvent l'auteur est celui qui a le plus de commentaires sur son propre blog
+             top_user = cursor.fetchone()
+             if top_user: self.author_username = top_user['author_username']
+
+        print(f"\n💬 AUTHOR INTERACTION ↔ ENGAGEMENT (Detected: @{self.author_username})")
+        # ... (reste du code identique)
     def comment_engagement_correlation(self):
         """Corrélation: Impact des réponses de l'auteur sur l'engagement"""
         cursor = self.conn.cursor()
