@@ -215,7 +215,7 @@ MIT License.
 
 ---
 
-🧭 Inspiration & Related Tools
+## 🧭 Inspiration & Related Tools
 
 This project was inspired in part by the work of the DEV.to community, especially:
 
