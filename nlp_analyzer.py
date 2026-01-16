@@ -3,6 +3,9 @@ import sqlite3
 import requests
 import spacy
 import time
+import sys
+from collections import Counter
+from textblob import TextBlob
 
 class NLPAnalyzer:
     def __init__(self, api_key, db_path="devto_metrics.db"):
@@ -11,102 +14,81 @@ class NLPAnalyzer:
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
+        self.author_id = "pascal_cescato_692b7a8a20"
         
-        # Chargement du modèle spaCy (Anglais par défaut pour la tech)
         try:
             self.nlp = spacy.load("en_core_web_sm")
         except:
-            print("Exécute d'abord : python3 -m spacy download en_core_web_sm")
+            print("❌ Erreur : Modèle spaCy introuvable. Fais : python3 -m spacy download en_core_web_sm")
+            sys.exit(1)
 
-    def sync_markdown_bodies(self):
-        """Vérifie et récupère les nouveaux commentaires ET le Markdown"""
+    def sync_all(self):
+        """Récupère les nouveaux commentaires et assure que le Markdown est là"""
         cursor = self.conn.cursor()
-        
-        # 1. On identifie les articles à vérifier
         cursor.execute("SELECT article_id, title FROM article_metrics GROUP BY article_id")
         articles = cursor.fetchall()
-        
+
+        print(f"🔄 Vérification des nouveaux commentaires sur {len(articles)} articles...")
         for art in articles:
-            # Récupération de la liste des IDs de commentaires depuis l'API
             res = requests.get(f"https://dev.to/api/comments?a_id={art['article_id']}")
             if res.status_code == 200:
-                api_comments = res.json()
-                
-                for c in api_comments:
+                for c in res.json():
                     c_id = c.get('id_code')
-                    # Si le commentaire n'existe pas du tout en base, on le récupère
-                    cursor.execute("SELECT 1 FROM comments WHERE comment_id = ?", (c_id,))
-                    if not cursor.fetchone():
-                        print(f"✨ Nouveau commentaire trouvé sur '{art['title'][:30]}...'")
-                        # Ici on appelle l'endpoint de détail pour avoir le Markdown direct
+                    cursor.execute("SELECT body_markdown FROM comments WHERE comment_id = ?", (c_id,))
+                    row = cursor.fetchone()
+                    
+                    if not row or not row['body_markdown']:
+                        print(f"  ✨ Récupération Markdown pour comment {c_id} sur '{art['title'][:30]}...'")
                         detail = requests.get(f"https://dev.to/api/comments/{c_id}").json()
+                        md = detail.get('body_markdown', '')
                         
-                        # Insertion complète (plus besoin de passer par le HTML)
                         cursor.execute("""
-                            INSERT INTO comments (collected_at, comment_id, article_id, article_title, 
-                            author_username, body_markdown, created_at)
+                            INSERT OR REPLACE INTO comments 
+                            (collected_at, comment_id, article_id, article_title, author_username, body_markdown, created_at)
                             VALUES (CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)
                         """, (c_id, art['article_id'], art['title'], 
-                              detail.get('user', {}).get('username'), 
-                              detail.get('body_markdown'), detail.get('created_at')))
+                              detail.get('user', {}).get('username'), md, detail.get('created_at')))
                         self.conn.commit()
+                        time.sleep(0.2)
 
-    def extract_insights(self):
-        """Analyse sémantique des commentaires des lecteurs"""
+    def analyze(self):
+        """Analyse sémantique et sentimentale"""
         cursor = self.conn.cursor()
-        # On exclut tes propres commentaires pour l'analyse d'audience
-        cursor.execute("""
-            SELECT article_title, body_markdown 
-            FROM comments 
-            WHERE author_username != 'pascal_cescato_692b7a8a20' 
-            AND body_markdown IS NOT NULL
-        """)
-        
-        print(f"\n🧠 INSIGHTS SÉMANTIQUES (Lecteurs)")
+        # On récupère tout ce qui n'est pas de toi
+        cursor.execute("SELECT article_title, body_markdown FROM comments WHERE author_username != ?", (self.author_id,))
+        rows = cursor.fetchall()
+
+        print(f"\n🧠 ANALYSE DE L'AUDIENCE ({len(rows)} commentaires)")
         print("="*100)
-        
-        for row in cursor.fetchall():
-            doc = self.nlp(row['body_markdown'])
-            # Extraction des noms propres et entités techniques (ORG/PRODUCT)
-            tech_entities = [ent.text for ent in doc.ents if ent.label_ in ["ORG", "PRODUCT"]]
+
+        # Regroupement par article pour la synthèse
+        by_article = {}
+        for row in rows:
+            title = row['article_title']
+            if title not in by_article: by_article[title] = []
+            by_article[title].append(row['body_markdown'])
+
+        for title, texts in by_article.items():
+            full_text = " ".join(texts)
+            doc = self.nlp(full_text)
             
-            if tech_entities:
-                print(f"\nArt: {row['article_title'][:50]}...")
-                print(f"  └ Tags détectés: {', '.join(set(tech_entities))}")
-
-    def show_thematic_summary(self):
-        """Regroupe les insights par article pour une vision stratégique"""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT article_title, GROUP_CONCAT(body_markdown, ' || ') as all_comments
-            FROM comments 
-            WHERE author_username != 'pascal_cescato_692b7a8a20'
-            GROUP BY article_title
-        """)
-        
-        print(f"\n📑 SYNTHÈSE THÉMATIQUE PAR ARTICLE")
-        print("="*100)
-        
-        for row in cursor.fetchall():
-            doc = self.nlp(row['all_comments'])
-            # On filtre les mots-clés techniques et les concepts fréquents
+            # 1. Sentiment (Polarité de -1 à 1)
+            sentiment = TextBlob(full_text).sentiment.polarity
+            mood = "😊 Positif" if sentiment > 0.1 else "😐 Neutre" if sentiment > -0.1 else "😟 Négatif"
+            
+            # 2. Mots-clés (Noms communs les plus fréquents)
             keywords = [token.lemma_.lower() for token in doc 
-                        if token.pos_ in ['NOUN', 'PROPN'] 
-                        and not token.is_stop and len(token.text) > 2]
-            
-            # On prend les 5 plus fréquents
-            from collections import Counter
-            common = Counter(keywords).most_common(5)
-            tags = ", ".join([word for word, count in common])
-            
-            print(f"\n📘 {row['article_title'][:60]}...")
-            print(f"   🔝 Sujets chauds : {tags}")
+                        if token.pos_ in ['NOUN', 'PROPN'] and not token.is_stop and len(token.text) > 2]
+            common = [w for w, c in Counter(keywords).most_common(5)]
+
+            print(f"\n📘 {title[:70]}...")
+            print(f"   🎭 Ambiance : {mood} ({sentiment:.2f})")
+            print(f"   🔝 Sujets : {', '.join(common)}")
 
 if __name__ == "__main__":
-    import sys
     if len(sys.argv) < 2:
         print("Usage: python3 nlp_analyzer.py VOTRE_CLE_API")
     else:
-        analyzer = NLPAnalyzer(sys.argv[1])
-        analyzer.sync_markdown_bodies()
-        analyzer.extract_insights()
+        ana = NLPAnalyzer(sys.argv[1])
+        ana.sync_all()
+        ana.analyze()
