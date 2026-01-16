@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from dotenv import load_dotenv
 
+# Charge les variables d'environnement (.env)
 load_dotenv()
 
 class NLPAnalyzer:
@@ -16,13 +17,15 @@ class NLPAnalyzer:
         self._setup_db()
         
         try:
+            # Modèle léger pour l'extraction de concepts
             self.nlp = spacy.load("en_core_web_sm") 
         except:
-            print("❌ Modèle spaCy manquant.")
+            print("❌ Erreur : Modèle spaCy 'en_core_web_sm' manquant.")
+            print("👉 Lance : python3 -m spacy download en_core_web_sm")
             exit(1)
 
     def _setup_db(self):
-        """Crée la table des résultats officielle"""
+        """Initialise la table des insights si elle n'existe pas"""
         cursor = self.conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS comment_insights (
@@ -36,6 +39,7 @@ class NLPAnalyzer:
         self.conn.commit()
 
     def clean_text(self, html):
+        """Nettoie le HTML et retire les blocs de code pour l'analyse"""
         if not html: return ""
         soup = BeautifulSoup(html, "html.parser")
         for code in soup.find_all(['code', 'pre']):
@@ -43,13 +47,59 @@ class NLPAnalyzer:
         return soup.get_text(separator=' ').strip()
 
     def is_spam(self, text):
-        spam_keywords = ['investigator', 'hack', 'whatsapp', 'kasino', 'slot', '777']
+        """Filtre pragmatique contre les bots de casino et arnaques"""
+        spam_keywords = ['investigator', 'hack', 'whatsapp', 'kasino', 'slot', '777', 'putar', 'kaya']
         t = text.lower()
-        return any(k in t for k in spam_keywords) or ("🎰" in t or "🎡" in t)
+        suspicious_patterns = ["🎡", "🎰", "💰"]
+        
+        if any(p in t for p in suspicious_patterns): return True
+        if any(k in t for k in spam_keywords): return True
+        if "@" in t and ".com" in t and "gmail" in t: return True
+        return False
+
+    def find_unanswered_questions(self):
+        """Détecte les questions des lecteurs qui n'ont pas de réponse de ta part"""
+        cursor = self.conn.cursor()
+        query = """
+            SELECT q.article_title, q.author_username, q.body_html, q.created_at
+            FROM comments q
+            WHERE q.body_html LIKE '%?%' 
+            AND q.author_username != ?
+            AND NOT EXISTS (
+                SELECT 1 FROM comments a 
+                WHERE a.article_id = q.article_id 
+                AND a.author_username = ? 
+                AND a.created_at > q.created_at
+            )
+            ORDER BY q.created_at DESC
+        """
+        cursor.execute(query, (self.author_id, self.author_id))
+        questions = cursor.fetchall()
+
+        if questions:
+            print(f"\n❓ QUESTIONS EN ATTENTE ({len(questions)})")
+            print("-" * 80)
+            for q in questions:
+                text = self.clean_text(q['body_html'])[:120]
+                print(f"📘 {q['article_title'][:50]}...")
+                print(f"   👤 @{q['author_username']} : \"{text}...\"")
+                print(f"   📅 {q['created_at']}\n")
+        else:
+            print("\n✅ Aucune question en attente. Tu es à jour !")
+
+    def show_stats(self):
+        """Affiche le résumé global de l'ambiance"""
+        cursor = self.conn.cursor()
+        print("\n📊 ÉTAT GLOBAL DE L'AUDIENCE (Moteur VADER) :")
+        cursor.execute("SELECT mood, COUNT(*) as c FROM comment_insights GROUP BY mood")
+        for r in cursor.fetchall():
+            print(f"   {r['mood']} : {r['c']}")
 
     def run(self):
+        """Exécute l'analyse incrémentale"""
         cursor = self.conn.cursor()
-        # On ne traite que ce qui n'est PAS encore dans comment_insights
+        
+        # On ne traite que les nouveaux commentaires
         query = """
             SELECT c.comment_id, c.article_title, c.body_html 
             FROM comments c
@@ -59,41 +109,34 @@ class NLPAnalyzer:
         cursor.execute(query, (self.author_id,))
         rows = cursor.fetchall()
 
-        if not rows:
-            print("☕ Tout est à jour dans comment_insights.")
-            self.show_stats()
-            return
+        if rows:
+            print(f"🚀 Analyse VADER de {len(rows)} nouveaux commentaires...")
+            for row in rows:
+                text = self.clean_text(row['body_html'])
+                if text and not self.is_spam(text):
+                    vs = self.vader.polarity_scores(text)
+                    score = vs['compound']
 
-        print(f"🚀 Analyse VADER de {len(rows)} nouveaux commentaires...")
-
-        for row in rows:
-            text = self.clean_text(row['body_html'])
-            if text and not self.is_spam(text):
-                vs = self.vader.polarity_scores(text)
-                score = vs['compound']
-
-                if score >= 0.3:
-                    mood = "🌟 Positif"
-                elif score <= -0.2:
-                    mood = "😟 Négatif"
-                else:
-                    mood = "😐 Neutre"
-    
-                cursor.execute("""
-                    INSERT OR REPLACE INTO comment_insights (comment_id, sentiment_score, mood)
-                    VALUES (?, ?, ?)
-                """, (row['comment_id'], score, mood))
+                    # Application des seuils calibrés
+                    if score >= 0.3:
+                        mood = "🌟 Positif"
+                    elif score <= -0.2:
+                        mood = "😟 Négatif"
+                    else:
+                        mood = "😐 Neutre"
         
-        self.conn.commit()
-        self.show_stats()
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO comment_insights (comment_id, sentiment_score, mood)
+                        VALUES (?, ?, ?)
+                    """, (row['comment_id'], score, mood))
+            self.conn.commit()
+            print("✅ Mise à jour terminée.")
+        else:
+            print("☕ Aucun nouveau commentaire à analyser.")
 
-    def show_stats(self):
-        """Résumé global des insights"""
-        cursor = self.conn.cursor()
-        print("\n📊 ÉTAT DE LA BASE (Moteur VADER) :")
-        cursor.execute("SELECT mood, COUNT(*) as c FROM comment_insights GROUP BY mood")
-        for r in cursor.fetchall():
-            print(f"   {r['mood']} : {r['c']}")
+        # Affichage des résultats
+        self.show_stats()
+        self.find_unanswered_questions()
 
 if __name__ == "__main__":
     analyzer = NLPAnalyzer()
