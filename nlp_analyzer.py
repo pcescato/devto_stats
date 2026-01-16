@@ -23,6 +23,22 @@ class NLPAnalyzer:
         for code in soup.find_all(['code', 'pre']):
             code.decompose()
         return soup.get_text(separator=' ')
+    
+    def is_spam(self, text):
+        """Détecte les patterns de spam courants sur DEV.to"""
+        spam_keywords = [
+            'investigator', 'investigating', 'hack', 'whatsapp', 
+            'gmail.com', 'privateinvestigators', 'spouse', 'cheating'
+        ]
+        text_lower = text.lower()
+        # Si un mot de la blacklist est présent, c'est du spam
+        if any(word in text_lower for word in spam_keywords):
+            return True
+        # Si le commentaire contient une adresse mail (souvent du spam sur DEV.to)
+        if "@" in text_lower and ".com" in text_lower:
+            return True
+        return False
+
 
     def run(self):
         cursor = self.conn.cursor()
@@ -39,6 +55,10 @@ class NLPAnalyzer:
             text = self.clean_text(row['body_html'])
             
             # Filtre anti-spam basique : on ignore les caractères non-latins (comme ton spam iranien)
+            text = self.clean_text(row['body_html'])
+            if self.is_spam(text):
+                continue
+            
             if text and any(ord(c) > 127 for c in text) and "ع" in text: 
                 continue
 
