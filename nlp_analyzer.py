@@ -44,18 +44,25 @@ class HTMLNLPAnalyzer:
             full_text = " ".join(texts)
             doc = self.nlp(full_text)
             
-            # Sentiment
+            # 1. Sentiment : On garde TextBlob mais on surveille le score
             sentiment = TextBlob(full_text).sentiment.polarity
-            mood = "🌟 Positif" if sentiment > 0.1 else "😐 Neutre"
             
-            # Mots-clés (Noms et Adjectifs)
-            keywords = [t.lemma_.lower() for t in doc 
-                        if t.pos_ in ['NOUN', 'ADJ'] and not t.is_stop and len(t.text) > 3]
+            # 2. Concepts : ON UTILISE .text AU LIEU DE .lemma_
+            # On filtre les mots de moins de 4 lettres et les stop-words
+            keywords = [t.text.lower() for t in doc 
+                        if not t.is_stop 
+                        and not t.is_punct 
+                        and t.is_alpha     # Uniquement des lettres (vire les chiffres/émojis)
+                        and len(t.text) > 3]
+            
+            # On prend les 6 plus fréquents
             common = [f"{w} ({c})" for w, c in Counter(keywords).most_common(6)]
 
+            mood = "🌟 Positif" if sentiment > 0.1 else "😟 Négatif" if sentiment < -0.1 else "😐 Neutre"
+            
             print(f"\n📘 {title[:70]}...")
             print(f"   🎭 Sentiment : {mood} ({sentiment:.3f})")
-            print(f"   🔝 Concepts  : {', '.join(common)}")
+            print(f"   🔝 Concepts  : {', '.join(common) if common else 'Rien de probant'}")
 
 if __name__ == "__main__":
     analyzer = HTMLNLPAnalyzer()
