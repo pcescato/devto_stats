@@ -52,38 +52,41 @@ class NLPAnalyzer:
                         time.sleep(0.2)
 
     def analyze(self):
-        """Analyse sémantique et sentimentale"""
         cursor = self.conn.cursor()
-        # On récupère tout ce qui n'est pas de toi
         cursor.execute("SELECT article_title, body_markdown FROM comments WHERE author_username != ?", (self.author_id,))
         rows = cursor.fetchall()
 
-        print(f"\n🧠 ANALYSE DE L'AUDIENCE ({len(rows)} commentaires)")
+        print(f"\n🧠 DEEP AUDIENCE ANALYSIS ({len(rows)} comments)")
         print("="*100)
 
-        # Regroupement par article pour la synthèse
         by_article = {}
         for row in rows:
             title = row['article_title']
             if title not in by_article: by_article[title] = []
-            by_article[title].append(row['body_markdown'])
+            if row['body_markdown']: by_article[title].append(row['body_markdown'])
 
         for title, texts in by_article.items():
-            full_text = " ".join(texts)
-            doc = self.nlp(full_text)
+            combined_text = " ".join(texts)
+            doc = self.nlp(combined_text)
             
-            # 1. Sentiment (Polarité de -1 à 1)
-            sentiment = TextBlob(full_text).sentiment.polarity
-            mood = "😊 Positif" if sentiment > 0.1 else "😐 Neutre" if sentiment > -0.1 else "😟 Négatif"
+            # 1. Sentiment Analyse par phrase (plus précis pour les longs textes)
+            sentences = [sent.text for sent in doc.sents]
+            scores = [TextBlob(s).sentiment.polarity for s in sentences]
+            avg_sentiment = sum(scores) / len(scores) if scores else 0
             
-            # 2. Mots-clés (Noms communs les plus fréquents)
-            keywords = [token.lemma_.lower() for token in doc 
-                        if token.pos_ in ['NOUN', 'PROPN'] and not token.is_stop and len(token.text) > 2]
-            common = [w for w, c in Counter(keywords).most_common(5)]
+            # 2. Extraction de mots-clés (Noms + Adjectifs pour capter l'intention)
+            keywords = []
+            for token in doc:
+                if (token.pos_ in ['NOUN', 'PROPN', 'ADJ']) and not token.is_stop and len(token.text) > 3:
+                    keywords.append(token.lemma_.lower())
+            
+            common = [f"{w} ({c})" for w, c in Counter(keywords).most_common(6)]
 
+            mood = "🌟 Très Positif" if avg_sentiment > 0.2 else "😊 Positif" if avg_sentiment > 0.05 else "😐 Neutre"
+            
             print(f"\n📘 {title[:70]}...")
-            print(f"   🎭 Ambiance : {mood} ({sentiment:.2f})")
-            print(f"   🔝 Sujets : {', '.join(common)}")
+            print(f"   🎭 Sentiment Global : {mood} ({avg_sentiment:.3f})")
+            print(f"   🔝 Concepts clés    : {', '.join(common)}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
