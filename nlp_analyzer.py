@@ -60,6 +60,34 @@ class NLPAnalyzer:
                 print(f"\nArt: {row['article_title'][:50]}...")
                 print(f"  └ Tags détectés: {', '.join(set(tech_entities))}")
 
+    def show_thematic_summary(self):
+        """Regroupe les insights par article pour une vision stratégique"""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT article_title, GROUP_CONCAT(body_markdown, ' || ') as all_comments
+            FROM comments 
+            WHERE author_username != 'pascal_cescato_692b7a8a20'
+            GROUP BY article_title
+        """)
+        
+        print(f"\n📑 SYNTHÈSE THÉMATIQUE PAR ARTICLE")
+        print("="*100)
+        
+        for row in cursor.fetchall():
+            doc = self.nlp(row['all_comments'])
+            # On filtre les mots-clés techniques et les concepts fréquents
+            keywords = [token.lemma_.lower() for token in doc 
+                        if token.pos_ in ['NOUN', 'PROPN'] 
+                        and not token.is_stop and len(token.text) > 2]
+            
+            # On prend les 5 plus fréquents
+            from collections import Counter
+            common = Counter(keywords).most_common(5)
+            tags = ", ".join([word for word, count in common])
+            
+            print(f"\n📘 {row['article_title'][:60]}...")
+            print(f"   🔝 Sujets chauds : {tags}")
+
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
