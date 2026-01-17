@@ -77,7 +77,7 @@ class ArticleLister:
             pub_date = article['published_at'][:10] if article['published_at'] else 'N/A'
             
             # Mark deleted articles
-            deleted_marker = " 🗑️" if article.get('is_deleted') else ""
+            deleted_marker = " 🗑️" if article['is_deleted'] else ""
             title = title + deleted_marker
             
             print(f"{article['article_id']:<10} {title:<50} {pub_date:<12} "
