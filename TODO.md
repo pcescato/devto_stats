@@ -20,3 +20,5 @@ This project is a **Work In Progress**. While the core ETL pipeline and sentimen
 - [ ] **Create `article_history` table**: Store `title`, `body_markdown`, and `tags` indexed by `article_id` and `version_timestamp`.
 - [ ] **Detection Logic**: Update the fetcher to compare incoming content with the latest stored version. Trigger a new entry if a delta is detected.
 - [ ] **Impact Analysis**: Correlate content updates with velocity spikes in `sismograph.py` (Did the title change boost views?).
+- [ ] - [ ] **Content Delta Tracking**: Automatically log title/tags/body changes in `article_history`.
+- [ ] **Sismograph Annotation**: Mark "Edit" events on the timeline to visualize the direct impact of title changes on velocity.
