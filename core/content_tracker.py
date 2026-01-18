@@ -17,8 +17,9 @@ class ContentTracker:
             WHERE article_id = ? 
             ORDER BY changed_at DESC LIMIT 1
         """
-        with self.db.get_connection() as conn:
-            last_version = conn.execute(query, (article_id,)).fetchone()
+        conn = self.db.get_connection()
+        last_version = conn.execute(query, (article_id,)).fetchone()
+        conn.close()
 
         # Si c'est la première fois ou si edited_at a changé
         if not last_version or (edited_at_api and edited_at_api != last_version['edited_at_api']):
@@ -44,5 +45,7 @@ class ContentTracker:
             INSERT INTO article_history (article_id, title, tags, edited_at_api, changed_at) 
             VALUES (?, ?, ?, ?, ?)
         """
-        with self.db.get_connection() as conn:
-            conn.execute(query, (article_id, title, tags, edited_at_api, datetime.now()))
+        conn = self.db.get_connection()
+        conn.execute(query, (article_id, title, tags, edited_at_api, datetime.now()))
+        conn.commit()
+        conn.close()

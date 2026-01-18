@@ -64,11 +64,13 @@ class DatabaseManager:
 
     def log_milestone(self, article_id, event_type, description):
         """Enregistre un événement (changement de titre, curation staff, etc.)"""
-        with self.get_connection() as conn:
-            conn.execute(
-                "INSERT INTO milestone_events (article_id, event_type, description) VALUES (?, ?, ?)",
-                (article_id, event_type, description)
-            )
+        conn = self.get_connection()
+        conn.execute(
+            "INSERT INTO milestone_events (article_id, event_type, description) VALUES (?, ?, ?)",
+            (article_id, event_type, description)
+        )
+        conn.commit()
+        conn.close()
 
     def get_all_active_articles(self):
         """Récupère la liste propre pour list_articles.py."""
