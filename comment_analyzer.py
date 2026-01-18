@@ -188,8 +188,9 @@ class CommentAnalyzer:
             period = (last - first).days
             period_str = f"{period} days" if period > 0 else "same day"
             
+            avg_len = reader['avg_length'] if reader['avg_length'] else 0
             print(f"{name:<30} {reader['articles_commented']:<10} {reader['total_comments']:<10} "
-                  f"{reader['avg_length']:<12.0f} {period_str}")
+                  f"{avg_len:<12.0f} {period_str}")
     
     def comment_timing_analysis(self):
         """Analyze when comments typically arrive"""
