@@ -310,12 +310,114 @@ class AdvancedAnalytics:
         self.article_follower_correlation()
         self.best_publishing_times()
         self.comment_engagement_correlation()
-    
-    def close(self):
-        """Close database connection"""
-        if self.conn:
-            self.conn.close()
 
+
+    def milestone_timeline(self, article_id: int = None):
+        """
+        Affiche une timeline des événements marquants
+        (changements de titre, curation staff, suppressions, etc.)
+        """
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+        
+        print(f"\n📅 MILESTONE TIMELINE")
+        print("=" * 100)
+        
+        # Récupérer les événements
+        if article_id:
+            query = """
+                SELECT 
+                    id,
+                    article_id,
+                    event_type,
+                    description,
+                    occurred_at
+                FROM milestone_events
+                WHERE article_id = ?
+                ORDER BY occurred_at DESC
+            """
+            cursor.execute(query, (article_id,))
+        else:
+            query = """
+                SELECT 
+                    id,
+                    article_id,
+                    event_type,
+                    description,
+                    occurred_at
+                FROM milestone_events
+                ORDER BY occurred_at DESC
+            """
+            cursor.execute(query)
+        
+        events = cursor.fetchall()
+        
+        if not events:
+            print("\n⚪ Aucun événement milestone enregistré")
+            if not article_id:
+                print("   Conseil : Les événements sont enregistrés via db.log_milestone()")
+            conn.close()
+            return
+        
+        # Afficher les événements
+        print(f"\n{'Date':<20} {'Type':<15} {'Article ID':<12} {'Description':<45}")
+        print("-" * 100)
+        
+        for event in events:
+            occurred = event['occurred_at'][:19] if event['occurred_at'] else 'N/A'
+            event_type = event['event_type'][:14] if event['event_type'] else 'Unknown'
+            art_id = str(event['article_id']) if event['article_id'] else 'N/A'
+            description = event['description'][:42] + "..." if len(event['description']) > 45 else event['description']
+            
+            print(f"{occurred:<20} {event_type:<15} {art_id:<12} {description:<45}")
+        
+        # Statistiques
+        print(f"\n📊 STATISTIQUES")
+        print("-" * 100)
+        
+        # Compter par type
+        cursor.execute("""
+            SELECT 
+                event_type,
+                COUNT(*) as count
+            FROM milestone_events
+            GROUP BY event_type
+            ORDER BY count DESC
+        """)
+        
+        types = cursor.fetchall()
+        print(f"{'Type d\'événement':<30} {'Nombre':<10}")
+        print("-" * 40)
+        
+        for event_type in types:
+            print(f"{event_type['event_type']:<30} {event_type['count']:<10}")
+        
+        total = len(events)
+        print(f"\n📌 Total d'événements : {total}")
+        
+        # Articles affectés
+        cursor.execute("""
+            SELECT COUNT(DISTINCT article_id) as count
+            FROM milestone_events
+            WHERE article_id IS NOT NULL
+        """)
+        
+        result = cursor.fetchone()
+        articles_affected = result['count'] if result['count'] else 0
+        print(f"📄 Articles affectés : {articles_affected}")
+        
+        # Récemment (derniers 7 jours)
+        cursor.execute("""
+            SELECT COUNT(*) as count
+            FROM milestone_events
+            WHERE occurred_at >= datetime('now', '-7 days')
+        """)
+        
+        result = cursor.fetchone()
+        recent = result['count'] if result['count'] else 0
+        print(f"🔥 Événements cette semaine : {recent}")
+        
+        conn.close()
 
 def main():
     parser = argparse.ArgumentParser(
@@ -333,6 +435,10 @@ def main():
                        help='Correlation between comments and engagement')
     parser.add_argument('--full-report', action='store_true',
                        help='Generate full analytics report')
+    parser.add_argument('--milestones', action='store_true',
+                       help='Show milestone timeline')
+    parser.add_argument('--milestone-article', type=int, metavar='ARTICLE_ID',
+                       help='Show milestones for specific article')
     
     args = parser.parse_args()
     
@@ -349,8 +455,8 @@ def main():
             analytics.best_publishing_times()
         if args.comment_correlation:
             analytics.comment_engagement_correlation()
-    
-    analytics.close()
+        if args.milestones or args.milestone_article:
+            analytics.milestone_timeline(args.milestone_article)
 
 
 if __name__ == "__main__":
