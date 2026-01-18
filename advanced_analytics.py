@@ -114,6 +114,92 @@ class AdvancedAnalytics:
         
         v_diff = abs(metrics[-1]['views'] - metrics[0]['views'])
         return v_diff / abs(hours_offset)
+    
+    def weighted_follower_attribution(self, days=7):
+        """
+        Attribue les nouveaux followers au prorata du trafic (Share of Voice).
+        Analyse les 'days' derniers jours.
+        """
+        conn = self.db.get_connection()
+        
+        # 1. Définir la période d'analyse
+        end_time = datetime.now()
+        start_time = end_time - timedelta(days=days)
+        
+        print(f"\n📈 WEIGHTED FOLLOWER ATTRIBUTION (Last {days} days)")
+        print("=" * 110)
+        
+        # 2. Calculer le gain de followers total sur la période
+        # On récupère le point le plus proche du début et de la fin
+        f_start = conn.execute("""
+            SELECT follower_count FROM follower_events 
+            WHERE collected_at >= ? ORDER BY collected_at ASC LIMIT 1
+        """, (start_time.isoformat(),)).fetchone()
+        
+        f_end = conn.execute("""
+            SELECT follower_count FROM follower_events 
+            WHERE collected_at <= ? ORDER BY collected_at DESC LIMIT 1
+        """, (end_time.isoformat(),)).fetchone()
+        
+        if not f_start or not f_end:
+            print("❌ Données de followers insuffisantes.")
+            return
+
+        total_gain = f_end['follower_count'] - f_start['follower_count']
+        
+        if total_gain <= 0:
+            print(f"ℹ️ Aucun gain de followers sur les {days} derniers jours.")
+            return
+
+        # 3. Calculer les vues gagnées par CHAQUE article sur la période
+        articles = self.db.get_all_active_articles()
+        attribution_data = []
+        global_traffic_gain = 0
+        
+        for art in articles:
+            # Vues au début de la fenêtre
+            v_start = conn.execute("""
+                SELECT views FROM article_metrics 
+                WHERE article_id = ? AND collected_at >= ? 
+                ORDER BY collected_at ASC LIMIT 1
+            """, (art['article_id'], start_time.isoformat())).fetchone()
+            
+            # Vues à la fin
+            v_end = conn.execute("""
+                SELECT views FROM article_metrics 
+                WHERE article_id = ? AND collected_at <= ? 
+                ORDER BY collected_at DESC LIMIT 1
+            """, (art['article_id'], end_time.isoformat())).fetchone()
+            
+            if v_start and v_end:
+                gain = v_end['views'] - v_start['views']
+                if gain > 0:
+                    attribution_data.append({
+                        'title': art['title'],
+                        'views_gain': gain
+                    })
+                    global_traffic_gain += gain
+
+        if global_traffic_gain == 0:
+            print("❌ Aucun trafic détecté sur la période.")
+            return
+
+        # 4. Affichage du rapport pondéré
+        print(f"Total Gain: +{total_gain} followers | Total Traffic: {global_traffic_gain} views")
+        print("-" * 110)
+        print(f"{'Article':<50} {'Views':>12} {'Traffic %':>12} {'Followers':>15}")
+        print("-" * 110)
+        
+        # Trier par gain de vues pour voir les "moteurs" en haut
+        attribution_data.sort(key=lambda x: x['views_gain'], reverse=True)
+        
+        for item in attribution_data:
+            share = (item['views_gain'] / global_traffic_gain)
+            # On multiplie le gain total par la part de trafic de l'article
+            attributed_followers = share * total_gain
+            
+            title = (item['title'][:47] + "...") if len(item['title']) > 50 else item['title']
+            print(f"{title:<50} {item['views_gain']:>12,} {share:>11.1%} {attributed_followers:>15.1f}")
 
     def full_report(self):
         print("\n" + "=" * 110)
@@ -122,6 +208,7 @@ class AdvancedAnalytics:
         self.article_follower_correlation()
         self.comment_engagement_correlation()
         self.velocity_milestone_correlation()
+        self.weighted_follower_attribution(days=7)
 
 def main():
     parser = argparse.ArgumentParser()
