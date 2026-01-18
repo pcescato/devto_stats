@@ -5,30 +5,27 @@ from datetime import datetime
 class DatabaseManager:
     def __init__(self, db_path="devto_metrics.db"):
         self.db_path = db_path
-        # On s'assure que la base est saine dès l'initialisation
         self._run_migrations()
 
     def get_connection(self):
-        """Retourne une connexion prête à l'emploi avec row_factory."""
+        """Retourne une connexion avec row_factory pour accès par nom de colonne."""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
 
     def _run_migrations(self):
-        """Vérifie et met à jour le schéma automatiquement."""
+        """Assure que le schéma est à jour sans casser les données existantes."""
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        # 1. Vérification de 'is_deleted' dans article_metrics
-        # (C'est ce qui a fait planter list_articles.py tout à l'heure)
+        # 1. Migration article_metrics : ajout de is_deleted
         try:
             cursor.execute("SELECT is_deleted FROM article_metrics LIMIT 1")
         except sqlite3.OperationalError:
-            print("🔧 Migration : Ajout de la colonne 'is_deleted'...")
+            print("🔧 Migration : Ajout de 'is_deleted' dans article_metrics...")
             cursor.execute("ALTER TABLE article_metrics ADD COLUMN is_deleted INTEGER DEFAULT 0")
 
-        # 2. Création de la table d'historique (pour les changements de titres/contenus)
-        # On y ajoute un 'content_hash' pour détecter les changements sans stocker des gigas
+        # 2. Table historique : Création avec edited_at_api
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS article_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,11 +34,19 @@ class DatabaseManager:
                 slug TEXT,
                 tags TEXT,
                 content_hash TEXT,
+                edited_at_api TEXT,
                 changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # 3. Création de la table des événements marquants (Jess Lee, pics de vélocité)
+        # Migration historique : ajout de edited_at_api si la table existait déjà sans
+        try:
+            cursor.execute("SELECT edited_at_api FROM article_history LIMIT 1")
+        except sqlite3.OperationalError:
+            print("🔧 Migration : Ajout de 'edited_at_api' dans article_history...")
+            cursor.execute("ALTER TABLE article_history ADD COLUMN edited_at_api TEXT")
+
+        # 3. Table des événements marquants (Milestones)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS milestone_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,21 +60,18 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
-    # --- MÉTHODES UTILITAIRES POUR TES SCRIPTS ---
+    # --- MÉTHODES UTILITAIRES ---
 
-    def get_latest_article_snapshot(self, article_id):
-        """Récupère les dernières métriques connues d'un article."""
-        query = "SELECT * FROM article_metrics WHERE article_id = ? ORDER BY collected_at DESC LIMIT 1"
+    def log_milestone(self, article_id, event_type, description):
+        """Enregistre un événement (changement de titre, curation staff, etc.)"""
         with self.get_connection() as conn:
-            return conn.execute(query, (article_id,)).fetchone()
+            conn.execute(
+                "INSERT INTO milestone_events (article_id, event_type, description) VALUES (?, ?, ?)",
+                (article_id, event_type, description)
+            )
 
-    def mark_as_deleted(self, article_id):
-        """Soft delete d'un article."""
-        with self.get_connection() as conn:
-            conn.execute("UPDATE article_metrics SET is_deleted = 1 WHERE article_id = ?", (article_id,))
-            
     def get_all_active_articles(self):
-        """Centralise la liste des articles pour list_articles.py et sismograph.py."""
+        """Récupère la liste propre pour list_articles.py."""
         query = """
             SELECT article_id, title, slug, MAX(views) as total_views, MAX(published_at) as published_at
             FROM article_metrics 
@@ -79,3 +81,9 @@ class DatabaseManager:
         """
         with self.get_connection() as conn:
             return conn.execute(query).fetchall()
+
+    def get_latest_article_snapshot(self, article_id):
+        """Détails pour un article spécifique."""
+        query = "SELECT * FROM article_metrics WHERE article_id = ? ORDER BY collected_at DESC LIMIT 1"
+        with self.get_connection() as conn:
+            return conn.execute(query, (article_id,)).fetchone()
