@@ -22,3 +22,6 @@ This project is a **Work In Progress**. While the core ETL pipeline and sentimen
 - [ ] **Impact Analysis**: Correlate content updates with velocity spikes in `sismograph.py` (Did the title change boost views?).
 - [ ] - [ ] **Content Delta Tracking**: Automatically log title/tags/body changes in `article_history`.
 - [ ] **Sismograph Annotation**: Mark "Edit" events on the timeline to visualize the direct impact of title changes on velocity.
+- [ ] ## 🕵️ Content-Impact Correlation
+- [ ] **Automated Versioning**: Track every title/body edit to explain future "spikes" in `sismograph.py`.
+- [ ] **Authority Interaction Log**: Flag comments or reactions from high-authority accounts (like Dev.to staff) directly on the velocity timeline.
