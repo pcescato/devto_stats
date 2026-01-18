@@ -45,25 +45,25 @@ class TopicIntelligence:
             dna_report[theme]["views"] += art['views']
             dna_report[theme]["reactions"] += art['reactions']
 
-        print("\n" + "🧬" + " --- VOTRE ADN D'AUTEUR (MIRROR REPORT) ---")
+        print("\n" + "🧬" + " --- AUTHOR CONTENT DNA (MIRROR REPORT) ---")
         print("=" * 80)
-        print(f"{'Axe thématique':<25} {'Articles':<10} {'Vues Moy.':<12} {'Engagement %':<12}")
+        print(f"{'Thematic Axis':<25} {'Articles':<10} {'Avg Views':<12} {'Engagement %':<12}")
         print("-" * 80)
 
         for theme, stats in dna_report.items():
             if stats['count'] > 0:
                 avg_views = stats['views'] / stats['count']
-                # Taux d'engagement simple (Reactions / Vues)
                 engage = (stats['reactions'] / stats['views'] * 100) if stats['views'] > 0 else 0
                 print(f"{theme:<25} {stats['count']:<10} {avg_views:<12.0f} {engage:<12.2f}%")
 
-        print("\n💡 INTERPRÉTATION PRAGMATIQUE :")
-        # On cherche le thème qui a le meilleur engagement
+        print("\n💡 PRAGMATIC INTERPRETATION:")
+        # Best engagement
         best_engage = max(dna_report, key=lambda x: (dna_report[x]['reactions']/dna_report[x]['views'] if dna_report[x]['views'] > 0 else 0))
-        print(f"👉 C'est sur l'axe '{best_engage}' que ta communauté réagit le plus intensément.")
+        print(f"👉 Your community engages most intensely with the '{best_engage}' axis.")
         
+        # Best views
         best_views = max(dna_report, key=lambda x: (dna_report[x]['views']/dna_report[x]['count'] if dna_report[x]['count'] > 0 else 0))
-        print(f"👉 L'axe '{best_views}' est ton plus grand vecteur de visibilité brute.")
+        print(f"👉 The '{best_views}' axis is your strongest driver for raw visibility.")
 
 if __name__ == "__main__":
     TopicIntelligence().analyze_dna()
