@@ -345,9 +345,10 @@ class DevToDashboard:
         
         top_commenter = cursor.fetchone()
         if top_commenter and top_commenter['comment_count'] > 2:
+            avg_len = top_commenter['avg_length'] if top_commenter['avg_length'] else 0
             insights.append(f"👤 {top_commenter['author_name']} is very active: "
                           f"{top_commenter['comment_count']} comments this month "
-                          f"({top_commenter['avg_length']:.0f} chars avg)")
+                          f"({avg_len:.0f} chars avg)")
         
         # 3. Best engagement rate recently
         cursor.execute("""
@@ -427,15 +428,18 @@ class DevToDashboard:
         print("-" * 100)
         
         for commenter in commenters:
+            # Handle None avg_length
+            avg_len = commenter['avg_length'] if commenter['avg_length'] else 0
+            
             # Quality score based on length and diversity
-            quality_score = min(10, (commenter['avg_length'] / 100) * (commenter['articles_commented']))
+            quality_score = min(10, (avg_len / 100) * (commenter['articles_commented']))
             
             # Basic sentiment analysis (based on length and engagement)
-            if commenter['avg_length'] > 500:
+            if avg_len > 500:
                 sentiment = "🔥 Passionate"
-            elif commenter['avg_length'] > 300:
+            elif avg_len > 300:
                 sentiment = "💬 Engaged"
-            elif commenter['avg_length'] > 100:
+            elif avg_len > 100:
                 sentiment = "👍 Interested"
             else:
                 sentiment = "✓ Basic"
@@ -443,7 +447,7 @@ class DevToDashboard:
             name = commenter['author_name'][:22] + "..." if len(commenter['author_name']) > 25 else commenter['author_name']
             
             print(f"{name:<25} {commenter['comment_count']:>8} {commenter['articles_commented']:>8} "
-                  f"{commenter['avg_length']:>9.0f}ch {quality_score:>7.1f}/10 {sentiment:>10}")
+                  f"{avg_len:>9.0f}ch {quality_score:>7.1f}/10 {sentiment:>10}")
         
         # Most loyal commenters (return often)
         cursor.execute("""
@@ -505,7 +509,9 @@ class DevToDashboard:
             """, (article['article_id'],))
             
             comment_data = cursor.fetchone()
-            avg_comment_length = comment_data['avg_comment_length'] if comment_data['avg_comment_length'] else 0
+            avg_comment_length = comment_data['avg_comment_length'] if comment_data else 0
+            if avg_comment_length is None:
+                avg_comment_length = 0
             
             article_data.append({
                 'title': article['title'],
