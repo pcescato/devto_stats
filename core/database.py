@@ -62,15 +62,20 @@ class DatabaseManager:
 
     # --- MÉTHODES UTILITAIRES ---
 
-    def log_milestone(self, article_id, event_type, description):
+    def log_milestone(self, article_id, event_type, description, conn=None):
         """Enregistre un événement (changement de titre, curation staff, etc.)"""
-        conn = self.get_connection()
+        should_close = conn is None
+        if conn is None:
+            conn = self.get_connection()
+        
         conn.execute(
             "INSERT INTO milestone_events (article_id, event_type, description) VALUES (?, ?, ?)",
             (article_id, event_type, description)
         )
-        conn.commit()
-        conn.close()
+        
+        if should_close:
+            conn.commit()
+            conn.close()
 
     def get_all_active_articles(self):
         """Récupère la liste propre pour list_articles.py."""

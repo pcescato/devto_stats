@@ -50,7 +50,8 @@ class DevToTracker:
                     article_id=art['id'],
                     current_title=art['title'],
                     current_tags=json.dumps(art['tag_list']),
-                    edited_at_api=art.get('edited_at') # Utilisation du champ API
+                    edited_at_api=art.get('edited_at'), # Utilisation du champ API
+                    conn=conn  # Réutilise la connexion existante
                 )
             
             conn.commit()
