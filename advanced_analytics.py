@@ -43,19 +43,21 @@ class AdvancedAnalytics:
         for art in articles:
             pub_date = art['published_at']
             
-            # Point de données le plus proche de la publication
+            # Point de données le plus proche de la publication (fenêtre +/- 6h)
             cursor.execute("""
                 SELECT follower_count FROM follower_events 
+                WHERE julianday(collected_at) BETWEEN julianday(?) - 0.25 AND julianday(?) + 0.25
                 ORDER BY ABS(julianday(collected_at) - julianday(?)) ASC LIMIT 1
-            """, (pub_date,))
+            """, (pub_date, pub_date, pub_date))
             start = cursor.fetchone()
             
-            # Point de données le plus proche de J+7
+            # Point de données le plus proche de J+7 (fenêtre +/- 6h)
             target_end = (datetime.fromisoformat(pub_date.replace('Z', '+00:00')) + timedelta(days=7)).isoformat()
             cursor.execute("""
                 SELECT follower_count FROM follower_events 
+                WHERE julianday(collected_at) BETWEEN julianday(?) - 0.25 AND julianday(?) + 0.25
                 ORDER BY ABS(julianday(collected_at) - julianday(?)) ASC LIMIT 1
-            """, (target_end,))
+            """, (target_end, target_end, target_end))
             end = cursor.fetchone()
 
             if start and end:
