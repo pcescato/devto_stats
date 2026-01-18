@@ -7,7 +7,7 @@ from core.database import DatabaseManager
 class TopicIntelligence:
     def __init__(self, db_path="devto_metrics.db"):
         self.db = DatabaseManager(db_path)
-        # Définition de tes axes d'expertise (ton ADN)
+        # Defining your areas of expertise (your DNA)
         self.themes = {
             "Expertise Tech": ["sql", "database", "python", "cloud", "docker", "vps", "astro", "hugo", "vector", "cte"],
             "Human & Career": ["cv", "career", "feedback", "developer", "learning", "growth"],
@@ -24,7 +24,7 @@ class TopicIntelligence:
                 if kw in text:
                     scores[theme] += 1
         
-        # On retourne le thème avec le plus de correspondances, ou 'Autre'
+        # We return the theme with the most matches, or 'Other'
         max_theme = max(scores, key=scores.get)
         return max_theme if scores[max_theme] > 0 else "Free Exploration"
 

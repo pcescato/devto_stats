@@ -149,8 +149,9 @@ class CommentAnalyzer:
             duration = last - first
             duration_str = f"{duration.days}d {duration.seconds//3600}h"
             
+            avg_len = article['avg_length'] if article['avg_length'] else 0
             print(f"{title:<50} {article['comment_count']:<10} {article['unique_commenters']:<8} "
-                  f"{article['avg_length']:<12.0f} {duration_str}")
+                  f"{avg_len:<12.0f} {duration_str}")
     
     def find_engaged_readers(self):
         """Find your most engaged readers (across all articles)"""
