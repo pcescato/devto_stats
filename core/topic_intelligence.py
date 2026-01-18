@@ -26,7 +26,7 @@ class TopicIntelligence:
         
         # On retourne le thème avec le plus de correspondances, ou 'Autre'
         max_theme = max(scores, key=scores.get)
-        return max_theme if scores[max_theme] > 0 else "Exploration Libre"
+        return max_theme if scores[max_theme] > 0 else "Free Exploration"
 
     def analyze_dna(self):
         """Génère le miroir d'impact de ton contenu."""
@@ -37,7 +37,7 @@ class TopicIntelligence:
         """).fetchall()
 
         dna_report = {theme: {"count": 0, "views": 0, "reactions": 0} for theme in self.themes}
-        dna_report["Exploration Libre"] = {"count": 0, "views": 0, "reactions": 0}
+        dna_report["Free Exploration"] = {"count": 0, "views": 0, "reactions": 0}
 
         for art in articles:
             theme = self._get_article_theme(art['title'], art['tags'] or "")
