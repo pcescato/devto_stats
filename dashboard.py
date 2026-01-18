@@ -14,6 +14,7 @@ from core.topic_intelligence import TopicIntelligence
 class DevToDashboard:
     def __init__(self, db_path: str = "devto_metrics.db"):
         self.db = DatabaseManager(db_path)
+        self.db_path = db_path
     
     def show_full_dashboard(self):
         """Display full dashboard"""
