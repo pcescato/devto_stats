@@ -454,10 +454,8 @@ class DevToDashboard:
         cursor.execute("""
             SELECT 
                 author_username,
-                author_name,
                 COUNT(DISTINCT article_id) as articles
             FROM comments
-            WHERE author_name IS NOT NULL AND author_username IS NOT NULL
             GROUP BY author_username
             HAVING articles >= 3
             ORDER BY articles DESC
@@ -468,8 +466,7 @@ class DevToDashboard:
         if loyal:
             print(f"\n⭐ Most loyal readers (comment on multiple articles):")
             for reader in loyal:
-                if reader['author_name']:  # Double check to prevent None display
-                    print(f"  • {reader['author_name']} commented on {reader['articles']} different articles")
+                print(f"  • {reader['author_username']} commented on {reader['articles']} different articles")
         
         conn.close()
     
