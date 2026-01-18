@@ -9,6 +9,7 @@ from collections import Counter, defaultdict
 import argparse
 import re
 from core.database import DatabaseManager
+from core.topic_intelligence import TopicIntelligence
 
 class DevToDashboard:
     def __init__(self, db_path: str = "devto_metrics.db"):
@@ -38,8 +39,16 @@ class DevToDashboard:
         
         # 6. Performance comparison
         self.show_article_comparison()
+
+        # 7. Author DNA analysis
+        self.display_author_dna()
         
         print("\n" + "="*100)
+
+    def display_author_dna(self):
+        analyzer = TopicIntelligence(self.db_path)
+        print("\n" + "🧬" + " --- VOTRE PROFIL D'AUTEUR (DNA) ---")
+        analyzer.analyze_dna()
     
     def show_latest_article_detail(self):
         """Detailed metrics for latest article"""
