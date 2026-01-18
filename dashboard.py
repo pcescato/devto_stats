@@ -338,13 +338,14 @@ class DevToDashboard:
                 AVG(body_length) as avg_length
             FROM comments
             WHERE collected_at >= datetime('now', '-30 days')
+            AND author_name IS NOT NULL
             GROUP BY author_name
             ORDER BY comment_count DESC
             LIMIT 1
         """)
         
         top_commenter = cursor.fetchone()
-        if top_commenter and top_commenter['comment_count'] > 2:
+        if top_commenter and top_commenter['author_name'] and top_commenter['comment_count'] > 2:
             avg_len = top_commenter['avg_length'] if top_commenter['avg_length'] else 0
             insights.append(f"👤 {top_commenter['author_name']} is very active: "
                           f"{top_commenter['comment_count']} comments this month "
