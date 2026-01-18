@@ -39,15 +39,35 @@ devto-metrics-tracker/
 ### 1. Requirements
 
 ```bash
-pip install requests
+pip install requests python-dotenv
 ```
 
-### 2. Initialization
+### 2. Configuration
+
+Create a `.env` file in the project root:
 
 ```bash
-python3 devto_tracker.py --api-key YOUR_API_KEY --init
-python3 devto_tracker.py --api-key YOUR_API_KEY --collect
+# Copy the example file
+cp .env.example .env
+
+# Edit .env and add your API key
+DEVTO_API_KEY=your_actual_api_key_here
+GEMINI_API_KEY=your_gemini_key_here  # Optional
 ```
+
+Get your DEV.to API key from: https://dev.to/settings/extensions
+
+### 3. Initialization
+
+```bash
+# Initialize database
+python3 devto_tracker.py --init
+
+# Collect your first snapshot
+python3 devto_tracker.py --collect
+```
+
+**Note:** API keys are now loaded from `.env` file automatically. No need to pass them via command line!
 
 ### 3. Automation (recommended)
 

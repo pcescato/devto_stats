@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Cleanup utility - Detect and handle deleted articles
-Usage: python3 cleanup_articles.py --api-key YOUR_KEY [options]
+Usage: python3 cleanup_articles.py [options]
 """
 
 import sqlite3
@@ -9,6 +9,11 @@ import requests
 import argparse
 from datetime import datetime, timezone
 import json
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class ArticleCleanup:
     def __init__(self, api_key: str, db_path: str = "devto_metrics.db"):
@@ -268,7 +273,7 @@ def main():
         description='Cleanup utility - Detect and handle deleted articles'
     )
     
-    parser.add_argument('--api-key', help='Your Dev.to API key (required for detection)')
+    parser.add_argument('--api-key', help='Your Dev.to API key (default: DEVTO_API_KEY env var, required for detection)')
     parser.add_argument('--db', default='devto_metrics.db', help='Database file path')
     parser.add_argument('--init', action='store_true', help='Initialize deleted tracking (add columns)')
     parser.add_argument('--detect', action='store_true', help='Detect deleted articles')
@@ -281,13 +286,17 @@ def main():
     
     args = parser.parse_args()
     
+    # Get API key from argument or environment variable
+    api_key = args.api_key or os.getenv('DEVTO_API_KEY', '')
+    
     # API key required for some operations
     if args.detect or args.mark_deleted:
-        if not args.api_key:
-            print("❌ --api-key required for detection operations")
+        if not api_key:
+            print("❌ Error: DEVTO_API_KEY not found for detection operations")
+            print("   Set it via: --api-key YOUR_KEY or environment variable DEVTO_API_KEY")
             return
     
-    cleanup = ArticleCleanup(args.api_key if args.api_key else '', args.db)
+    cleanup = ArticleCleanup(api_key, args.db)
     
     if args.init:
         cleanup.init_deleted_tracking()

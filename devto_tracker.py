@@ -10,6 +10,11 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import json
 import argparse
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class DevToTracker:
     def __init__(self, api_key: str, db_path: str = "devto_metrics.db"):
@@ -607,7 +612,7 @@ def main():
         description='DEV.to Metrics Tracker - Historical data collection'
     )
     
-    parser.add_argument('--api-key', required=True, help='Your Dev.to API key')
+    parser.add_argument('--api-key', help='Your Dev.to API key (default: DEVTO_API_KEY env var)')
     parser.add_argument('--db', default='devto_metrics.db', help='Database file path')
     parser.add_argument('--init', action='store_true', help='Initialize database')
     parser.add_argument('--collect', action='store_true', help='Collect snapshot')
@@ -622,7 +627,15 @@ def main():
     
     args = parser.parse_args()
     
-    tracker = DevToTracker(args.api_key, args.db)
+    # Get API key from argument or environment variable
+    api_key = args.api_key or os.getenv('DEVTO_API_KEY')
+    
+    if not api_key:
+        print("❌ Error: DEVTO_API_KEY not found")
+        print("   Set it via: --api-key YOUR_KEY or environment variable DEVTO_API_KEY")
+        return
+    
+    tracker = DevToTracker(api_key, args.db)
     
     if args.init:
         tracker.init_db()

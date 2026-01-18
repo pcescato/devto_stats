@@ -24,6 +24,11 @@ class ArticleLister:
         self.connect()
         cursor = self.conn.cursor()
         
+        # Check if is_deleted column exists
+        cursor.execute("PRAGMA table_info(article_metrics)")
+        columns = [col[1] for col in cursor.fetchall()]
+        has_deleted_column = 'is_deleted' in columns
+        
         # Build order by clause
         order_by = {
             "published": "published_at DESC",
@@ -34,8 +39,13 @@ class ArticleLister:
             "id": "article_id ASC"
         }.get(sort_by, "published_at DESC")
         
-        # Filter deleted articles unless explicitly requested
-        deleted_filter = "" if include_deleted else "AND (is_deleted IS NULL OR is_deleted = 0)"
+        # Filter deleted articles unless explicitly requested (only if column exists)
+        if has_deleted_column:
+            deleted_filter = "" if include_deleted else "AND (is_deleted IS NULL OR is_deleted = 0)"
+            deleted_select = ", MAX(is_deleted) as is_deleted"
+        else:
+            deleted_filter = ""
+            deleted_select = ""
         
         query = f"""
             SELECT 
@@ -44,8 +54,8 @@ class ArticleLister:
                 published_at,
                 MAX(views) as views,
                 MAX(reactions) as reactions,
-                MAX(comments) as comments,
-                MAX(is_deleted) as is_deleted
+                MAX(comments) as comments
+                {deleted_select}
             FROM article_metrics
             WHERE published_at IS NOT NULL
             {deleted_filter}
@@ -61,7 +71,7 @@ class ArticleLister:
         
         if not articles:
             print("\n❌ No articles found in database")
-            print("Run: python3 devto_tracker.py --api-key YOUR_KEY --collect")
+            print("Run: python3 devto_tracker.py --collect")
             return
         
         status_msg = "including deleted" if include_deleted else "active only"
@@ -76,8 +86,10 @@ class ArticleLister:
             title = article['title'][:47] + "..." if len(article['title']) > 50 else article['title']
             pub_date = article['published_at'][:10] if article['published_at'] else 'N/A'
             
-            # Mark deleted articles
-            deleted_marker = " 🗑️" if article['is_deleted'] else ""
+            # Mark deleted articles (if column exists)
+            deleted_marker = ""
+            if has_deleted_column and 'is_deleted' in article.keys():
+                deleted_marker = " 🗑️" if article['is_deleted'] else ""
             title = title + deleted_marker
             
             print(f"{article['article_id']:<10} {title:<50} {pub_date:<12} "

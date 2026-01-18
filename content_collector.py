@@ -4,9 +4,9 @@ DEV.to Content Collector
 Collects article content (markdown, code blocks, links) for future NLP analysis
 
 Usage:
-    python3 content_collector.py --api-key YOUR_KEY --collect-all    # First run: get all articles
-    python3 content_collector.py --api-key YOUR_KEY --collect-new    # Subsequent: only new articles
-    python3 content_collector.py --api-key YOUR_KEY --article 123    # Specific article
+    python3 content_collector.py --collect-all    # First run: get all articles
+    python3 content_collector.py --collect-new    # Subsequent: only new articles
+    python3 content_collector.py --article 123    # Specific article
 """
 
 import sqlite3
@@ -16,6 +16,11 @@ import re
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 import json
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 class ContentCollector:
     def __init__(self, api_key: str, db_path: str = "devto_metrics.db"):
@@ -482,7 +487,7 @@ def main():
         description='Collect DEV.to article content for NLP analysis'
     )
     
-    parser.add_argument('--api-key', required=True, help='DEV.to API key')
+    parser.add_argument('--api-key', help='DEV.to API key (default: DEVTO_API_KEY env var)')
     parser.add_argument('--db', default='devto_metrics.db', help='Database path')
     
     # Collection modes
@@ -499,11 +504,19 @@ def main():
     
     args = parser.parse_args()
     
+    # Get API key from argument or environment variable
+    api_key = args.api_key or os.getenv('DEVTO_API_KEY')
+    
+    if not api_key:
+        print("❌ Error: DEVTO_API_KEY not found")
+        print("   Set it via: --api-key YOUR_KEY or environment variable DEVTO_API_KEY")
+        return
+    
     print("=" * 80)
     print("📚 DEV.to Content Collector")
     print("=" * 80)
     
-    collector = ContentCollector(args.api_key, args.db)
+    collector = ContentCollector(api_key, args.db)
     
     try:
         # Initialize database

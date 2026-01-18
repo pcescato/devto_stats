@@ -34,25 +34,28 @@ Collect and store historical metrics from DEV.to API.
 
 ```bash
 # Initialize database schema
-python3 devto_tracker.py --api-key YOUR_KEY --init
+python3 devto_tracker.py --init
 
 # Collect full snapshot (articles, followers, metrics)
-python3 devto_tracker.py --api-key YOUR_KEY --collect
+python3 devto_tracker.py --collect
 
 # Collect daily analytics (read time, reaction breakdown)
-python3 devto_tracker.py --api-key YOUR_KEY --collect-daily
+python3 devto_tracker.py --collect-daily
 
 # Collect referrers/traffic sources (UNDOCUMENTED ENDPOINT!)
-python3 devto_tracker.py --api-key YOUR_KEY --collect-referrers
+python3 devto_tracker.py --collect-referrers
 
 # Analyze growth trends
-python3 devto_tracker.py --api-key YOUR_KEY --analyze-growth 30
+python3 devto_tracker.py --analyze-growth 30
 
 # Analyze specific article velocity
-python3 devto_tracker.py --api-key YOUR_KEY --analyze-article 3144468
+python3 devto_tracker.py --analyze-article 3144468
 
 # Custom database path
-python3 devto_tracker.py --api-key YOUR_KEY --db custom.db --collect
+python3 devto_tracker.py --db custom.db --collect
+
+# Override API key (if not in .env)
+python3 devto_tracker.py --api-key YOUR_KEY --init
 ```
 
 ---
@@ -285,9 +288,9 @@ python3 list_articles.py --top
 ### Daily Collection Routine
 ```bash
 # Collect all available data
-python3 devto_tracker.py --api-key YOUR_KEY --collect
-python3 devto_tracker.py --api-key YOUR_KEY --collect-daily
-python3 devto_tracker.py --api-key YOUR_KEY --collect-referrers
+python3 devto_tracker.py --collect
+python3 devto_tracker.py --collect-daily
+python3 devto_tracker.py --collect-referrers
 ```
 
 ### Quick Health Check
@@ -326,11 +329,26 @@ python3 quality_analytics.py --reactions        # What do they react to?
 
 ## 📝 Notes
 
+### Setup - Environment Variables
+⚠️ **IMPORTANT**: Store your API keys in a `.env` file instead of passing them via command line:
+
+```bash
+# Create .env file in the project root
+DEVTO_API_KEY=your_actual_api_key_here
+GEMINI_API_KEY=your_gemini_key_here
+```
+
+All collection scripts will now automatically read from this file.
+
 ### API Key
-All collection scripts require your DEV.to API key:
+You have two options:
+1. **Recommended**: Set `DEVTO_API_KEY` environment variable in `.env` file
+2. **Alternative**: Pass `--api-key YOUR_KEY` to any command (but this exposes the key in history)
+
+To get your API key:
 1. Go to https://dev.to/settings/extensions
 2. Generate an API key
-3. Use it with `--api-key YOUR_KEY`
+3. Add it to `.env` file
 
 ### Database Location
 - Default: `devto_metrics.db` in current directory
