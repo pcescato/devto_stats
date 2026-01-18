@@ -4,27 +4,18 @@ DEV.to Personal Dashboard
 Un dashboard complet pour comprendre votre impact réel
 """
 
-import sqlite3
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 import argparse
 import re
+from core.database import DatabaseManager
 
 class DevToDashboard:
     def __init__(self, db_path: str = "devto_metrics.db"):
-        self.db_path = db_path
-        self.conn = None
-    
-    def connect(self):
-        """Connect to database"""
-        if self.conn is None:
-            # Don't auto-convert timestamps (Python 3.12 compatibility)
-            self.conn = sqlite3.connect(self.db_path)
-            self.conn.row_factory = sqlite3.Row
+        self.db = DatabaseManager(db_path)
     
     def show_full_dashboard(self):
         """Display full dashboard"""
-        self.connect()
         
         print("\n" + "="*100)
         print("📊 DEV.TO PERSONAL DASHBOARD")
@@ -52,7 +43,8 @@ class DevToDashboard:
     
     def show_latest_article_detail(self):
         """Detailed metrics for latest article"""
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         # Latest published article
         cursor.execute("""
@@ -73,6 +65,7 @@ class DevToDashboard:
         article = cursor.fetchone()
         if not article:
             print("\n❌ No articles found")
+            conn.close()
             return
         
         article_id = article['article_id']
@@ -175,10 +168,12 @@ class DevToDashboard:
             for comment in recent_comments:
                 created = comment['created_at'][:10] if comment['created_at'] else 'N/A'
                 print(f"  • {comment['author_name']} ({comment['body_length']} chars) - {created}")
+        
     
     def show_last_5_articles(self):
         """View of last 5 articles"""
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         cursor.execute("""
             SELECT 
@@ -211,10 +206,13 @@ class DevToDashboard:
             
             print(f"{title:<50} {pub_date:<12} {article['views']:>7} {article['reactions']:>7} "
                   f"{article['comments']:>6} {engagement:>5.1f}%")
+        
+        conn.close()
     
     def show_global_trend(self):
         """Global trend"""
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         # Get max metrics per article for last 30 days
         cursor.execute("""
@@ -296,10 +294,13 @@ class DevToDashboard:
         print(f"  Views:     {avg['avg_views']:.0f}")
         print(f"  Reactions: {avg['avg_reactions']:.1f}")
         print(f"  Comments:  {avg['avg_comments']:.1f}")
+        
+        conn.close()
     
     def show_significant_insights(self):
         """Automatic significant insights"""
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         print(f"\n\n💡 SIGNIFICANT INSIGHTS")
         print("-" * 100)
@@ -391,10 +392,13 @@ class DevToDashboard:
                 print(f"  • {insight}")
         else:
             print("  • Not enough data to generate insights (collect for a few days)")
+        
+        conn.close()
     
     def show_top_commenters(self):
         """Analyze commenters with quality and sentiment"""
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         print(f"\n\n👥 TOP COMMENTERS (Quality & engagement analysis)")
         print("-" * 100)
@@ -458,10 +462,13 @@ class DevToDashboard:
             print(f"\n⭐ Most loyal readers (comment on multiple articles):")
             for reader in loyal:
                 print(f"  • {reader['author_name']} commented on {reader['articles']} different articles")
+        
+        conn.close()
     
     def show_article_comparison(self):
         """Performance comparison between articles"""
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         print(f"\n\n📊 PERFORMANCE COMPARISON")
         print("-" * 100)
@@ -545,6 +552,8 @@ class DevToDashboard:
                     avg_engagement = sum(a['engagement_rate'] for a in articles_list) / len(articles_list)
                     print(f"  • {description}: {len(articles_list)} articles | "
                           f"Avg {avg_views:.0f} views | {avg_engagement:.1f}% engagement")
+        
+        conn.close()
 
 def main():
     parser = argparse.ArgumentParser(description="DEV.to Personal Dashboard")

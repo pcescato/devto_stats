@@ -4,24 +4,23 @@ Advanced Analytics - Combining all historical data
 Analyses croisées et insights avancés
 """
 
-import sqlite3
 import argparse
 from datetime import datetime, timedelta
 from collections import defaultdict
 import statistics
+from core.database import DatabaseManager
 
 class AdvancedAnalytics:
     def __init__(self, db_path: str):
-        self.db_path = db_path
-        self.conn = sqlite3.connect(db_path)
-        self.conn.row_factory = sqlite3.Row
+        self.db = DatabaseManager(db_path)
     
     def article_follower_correlation(self):
         """
         Corrélation: Quel article a apporté le plus de followers ?
         Analyse les pics de followers après publication
         """
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         print("\n📊 ARTICLE → FOLLOWER CORRELATION")
         print("=" * 100)
@@ -96,13 +95,16 @@ class AdvancedAnalytics:
             avg_followers = statistics.mean(a['followers'] for a in article_impact)
             print(f"\n📈 Total new followers tracked: {total_followers}")
             print(f"📈 Average per article: {avg_followers:.1f}")
+        
+        conn.close()
     
     def engagement_evolution(self, article_id: int):
         """
         Évolution détaillée de l'engagement pour un article
         Montre la courbe de croissance avec tous les indicateurs
         """
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         # Get article info
         cursor.execute("""
@@ -115,6 +117,7 @@ class AdvancedAnalytics:
         article = cursor.fetchone()
         if not article:
             print(f"❌ Article {article_id} not found")
+            conn.close()
             return
         
         print(f"\n📈 ENGAGEMENT EVOLUTION")
@@ -139,6 +142,7 @@ class AdvancedAnalytics:
         
         if len(metrics) < 2:
             print("\n⚠️  Not enough data points yet (need at least 2 collections)")
+            conn.close()
             return
         
         print(f"\n{'Time':<20} {'Views':<10} {'Δ Views':<12} {'Reactions':<12} {'Comments':<10} {'Engagement %'}")
@@ -177,12 +181,15 @@ class AdvancedAnalytics:
             print(f"Peak velocity: {max(view_diffs):.1f} views/hour")
             print(f"Average velocity: {statistics.mean(view_diffs):.1f} views/hour")
             print(f"Current velocity: {view_diffs[-1]:.1f} views/hour")
+        
+        conn.close()
     
     def best_publishing_times(self):
         """
         Analyse: Quels jours/heures fonctionnent le mieux ?
         """
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         print(f"\n⏰ BEST PUBLISHING TIMES")
         print("=" * 80)
@@ -249,12 +256,15 @@ class AdvancedAnalytics:
             avg_reactions = statistics.mean(stats['reactions'])
             
             print(f"{hour:02d}:00 {count:<10} {avg_views:<12.0f} {avg_reactions:.1f}")
+        
+        conn.close()
     
     def comment_engagement_correlation(self):
         """
         Corrélation: Articles avec beaucoup de commentaires = plus de followers ?
         """
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         print(f"\n💬 COMMENT ↔ FOLLOWER CORRELATION")
         print("=" * 80)
@@ -288,6 +298,8 @@ class AdvancedAnalytics:
             
             print(f"{title:<40} {article['comments']:<10} {article['unique_commenters']:<8} "
                   f"{article['views']:<10} {engagement:.2f}%")
+        
+        conn.close()
     
     def full_report(self):
         """Generate comprehensive analytics report"""

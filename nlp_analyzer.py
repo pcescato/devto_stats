@@ -1,17 +1,16 @@
 import os
-import sqlite3
 import spacy
 from bs4 import BeautifulSoup
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from dotenv import load_dotenv
+from core.database import DatabaseManager
 
 # Charge les variables d'environnement (.env)
 load_dotenv()
 
 class NLPAnalyzer:
     def __init__(self, db_path="devto_metrics.db"):
-        self.conn = sqlite3.connect(db_path)
-        self.conn.row_factory = sqlite3.Row
+        self.db = DatabaseManager(db_path)
         self.author_id = "pascal_cescato_692b7a8a20"
         self.vader = SentimentIntensityAnalyzer()
         self._setup_db()
@@ -26,7 +25,8 @@ class NLPAnalyzer:
 
     def _setup_db(self):
         """Initialise la table des insights si elle n'existe pas"""
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS comment_insights (
                 comment_id TEXT PRIMARY KEY,
@@ -36,7 +36,8 @@ class NLPAnalyzer:
                 FOREIGN KEY (comment_id) REFERENCES comments (comment_id)
             )
         """)
-        self.conn.commit()
+        conn.commit()
+        conn.close()
 
     def clean_text(self, html):
         """Nettoie le HTML et retire les blocs de code pour l'analyse"""
@@ -59,7 +60,8 @@ class NLPAnalyzer:
 
     def find_unanswered_questions(self):
         """Détecte les questions des lecteurs qui n'ont pas de réponse de ta part"""
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         query = """
             SELECT q.article_title, q.author_username, q.body_html, q.created_at
             FROM comments q
@@ -75,6 +77,7 @@ class NLPAnalyzer:
         """
         cursor.execute(query, (self.author_id, self.author_id))
         questions = cursor.fetchall()
+        conn.close()
 
         if questions:
             print(f"\n❓ QUESTIONS EN ATTENTE ({len(questions)})")
@@ -89,15 +92,18 @@ class NLPAnalyzer:
 
     def show_stats(self):
         """Affiche le résumé global de l'ambiance"""
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         print("\n📊 ÉTAT GLOBAL DE L'AUDIENCE (Moteur VADER) :")
         cursor.execute("SELECT mood, COUNT(*) as c FROM comment_insights GROUP BY mood")
         for r in cursor.fetchall():
             print(f"   {r['mood']} : {r['c']}")
+        conn.close()
 
     def run(self):
         """Exécute l'analyse incrémentale"""
-        cursor = self.conn.cursor()
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
         
         # On ne traite que les nouveaux commentaires
         query = """
@@ -129,11 +135,13 @@ class NLPAnalyzer:
                         INSERT OR REPLACE INTO comment_insights (comment_id, sentiment_score, mood)
                         VALUES (?, ?, ?)
                     """, (row['comment_id'], score, mood))
-            self.conn.commit()
+            conn.commit()
             print("✅ Mise à jour terminée.")
         else:
             print("☕ Aucun nouveau commentaire à analyser.")
 
+        conn.close()
+        
         # Affichage des résultats
         self.show_stats()
         self.find_unanswered_questions()
