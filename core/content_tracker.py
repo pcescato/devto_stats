@@ -11,6 +11,47 @@ import time
 from datetime import datetime, timezone, timedelta
 from core.database import DatabaseManager
 
+class ContentTracker:
+    """Détecte les changements de contenu (titre, tags) et logue les milestones."""
+    
+    def __init__(self, db: DatabaseManager):
+        self.db = db
+    
+    def check_content_updates(self, article_id, current_title, current_tags, conn=None):
+        """
+        Compare le contenu actuel avec la dernière version connue.
+        Logue un milestone si le titre a changé.
+        """
+        should_close = conn is None
+        if conn is None:
+            conn = self.db.get_connection()
+        
+        # Récupérer la dernière version connue
+        cursor = conn.execute("""
+            SELECT title, tags FROM article_history 
+            WHERE article_id = ? 
+            ORDER BY changed_at DESC LIMIT 1
+        """, (article_id,))
+        last_version = cursor.fetchone()
+        
+        # Si c'est la première fois ou si quelque chose a changé
+        if not last_version or last_version['title'] != current_title or last_version['tags'] != current_tags:
+            # Sauvegarder la nouvelle version
+            conn.execute("""
+                INSERT INTO article_history (article_id, title, tags, changed_at) 
+                VALUES (?, ?, ?, ?)
+            """, (article_id, current_title, current_tags, datetime.now()))
+            
+            # Si c'est un changement de titre (événement majeur)
+            if last_version and last_version['title'] != current_title:
+                description = f"Title change: '{last_version['title']}' → '{current_title}'"
+                self.db.log_milestone(article_id, 'title_change', description, conn)
+                print(f"📢 {description}")
+        
+        if should_close:
+            conn.commit()
+            conn.close()
+
 class DevToTracker:
     def __init__(self, api_key: str, db_path: str = "devto_metrics.db"):
         self.db = DatabaseManager(db_path)
