@@ -9,15 +9,17 @@ Usage:
     python3 content_collector.py --article 123    # Specific article
 """
 
-import sqlite3
 import requests
 import argparse
 import re
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
-import json
 import os
+import time
 from dotenv import load_dotenv
+
+# Import DatabaseManager from core
+from core.database import DatabaseManager
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,16 +27,14 @@ load_dotenv()
 class ContentCollector:
     def __init__(self, api_key: str, db_path: str = "devto_metrics.db"):
         self.api_key = api_key
-        self.db_path = db_path
+        self.db_manager = DatabaseManager(db_path)
         self.base_url = "https://dev.to/api"
         self.headers = {"api-key": api_key}
-        self.conn = None
     
     def init_db(self):
         """Initialize database with content tables"""
-        self.conn = sqlite3.connect(self.db_path, timeout=30.0)
-        self.conn.row_factory = sqlite3.Row
-        cursor = self.conn.cursor()
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
         
         print("📊 Creating content tables if they don't exist...")
         
@@ -98,7 +98,8 @@ class ContentCollector:
             ON article_links(article_id)
         """)
         
-        self.conn.commit()
+        conn.commit()
+        conn.close()
         print("✅ Tables created/verified")
     
     def get_articles_to_collect(self, mode: str = "new", specific_id: Optional[int] = None) -> List[int]:
@@ -112,7 +113,8 @@ class ContentCollector:
         Returns:
             List of article IDs
         """
-        cursor = self.conn.cursor()
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
         
         if specific_id:
             # Check if article exists
@@ -120,7 +122,10 @@ class ContentCollector:
                 SELECT article_id FROM article_metrics WHERE article_id = ?
             """, (specific_id,))
             
-            if cursor.fetchone():
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
                 return [specific_id]
             else:
                 print(f"⚠️  Article {specific_id} not found in database")
@@ -136,6 +141,7 @@ class ContentCollector:
             """)
             
             articles = [row['article_id'] for row in cursor.fetchall()]
+            conn.close()
             print(f"📚 Found {len(articles)} total articles")
             return articles
         
@@ -151,10 +157,12 @@ class ContentCollector:
             """)
             
             articles = [row['article_id'] for row in cursor.fetchall()]
+            conn.close()
             print(f"📝 Found {len(articles)} new articles (not yet collected)")
             return articles
         
         else:
+            conn.close()
             print(f"❌ Unknown mode: {mode}")
             return []
     
@@ -264,7 +272,8 @@ class ContentCollector:
         """
         Save article content to database
         """
-        cursor = self.conn.cursor()
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
         timestamp = datetime.now(timezone.utc).isoformat()
         
         markdown = article_data.get('body_markdown', '')
@@ -272,6 +281,7 @@ class ContentCollector:
         
         if not markdown:
             print(f"  ⚠️  No markdown content for article {article_id}")
+            conn.close()
             return
         
         # Parse markdown
@@ -327,7 +337,8 @@ class ContentCollector:
                 link['link_type']
             ))
         
-        self.conn.commit()
+        conn.commit()
+        conn.close()
         
         # Print summary
         print(f"  ✅ Saved: {metrics['word_count']} words, "
@@ -350,7 +361,8 @@ class ContentCollector:
         
         for i, article_id in enumerate(article_ids, 1):
             # Get article title for nicer display
-            cursor = self.conn.cursor()
+            conn = self.db_manager.get_connection()
+            cursor = conn.cursor()
             cursor.execute("""
                 SELECT title FROM article_metrics 
                 WHERE article_id = ? 
@@ -358,6 +370,7 @@ class ContentCollector:
             """, (article_id,))
             
             row = cursor.fetchone()
+            conn.close()
             title = row['title'][:60] if row else f"Article {article_id}"
             
             print(f"\n[{i}/{len(article_ids)}] {title}...")
@@ -378,7 +391,6 @@ class ContentCollector:
                 failed += 1
             
             # Small delay to be nice to API
-            import time
             time.sleep(0.5)
         
         # Summary
@@ -391,7 +403,8 @@ class ContentCollector:
     
     def show_stats(self):
         """Show statistics about collected content"""
-        cursor = self.conn.cursor()
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
         
         print("\n" + "=" * 80)
         print("📊 CONTENT DATABASE STATISTICS")
@@ -475,11 +488,8 @@ class ContentCollector:
         shortest = cursor.fetchone()
         if shortest:
             print(f"📄 Shortest article: {shortest['title'][:50]}... ({shortest['word_count']} words)")
-    
-    def close(self):
-        """Close database connection"""
-        if self.conn:
-            self.conn.close()
+        
+        conn.close()
 
 
 def main():
@@ -546,9 +556,10 @@ def main():
         print("\n" + "=" * 80)
         print("✅ Collection complete!")
         print("=" * 80)
-        
-    finally:
-        collector.close()
+    
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
+        raise
 
 
 if __name__ == "__main__":

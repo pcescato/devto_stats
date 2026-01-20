@@ -115,40 +115,64 @@ class AdvancedAnalytics:
         v_diff = abs(metrics[-1]['views'] - metrics[0]['views'])
         return v_diff / abs(hours_offset)
     
-    def weighted_follower_attribution(self, days=7):
+    def weighted_follower_attribution(self, hours=168):
         """
         Attribue les nouveaux followers au prorata du trafic (Share of Voice).
-        Analyse les 'days' derniers jours.
+        Analyse les 'hours' dernières heures.
         """
         conn = self.db.get_connection()
         
         # 1. Définir la période d'analyse
         end_time = datetime.now()
-        start_time = end_time - timedelta(days=days)
+        start_time = end_time - timedelta(hours=hours)
         
-        print(f"\n📈 WEIGHTED FOLLOWER ATTRIBUTION (Last {days} days)")
+        print(f"\n📈 PROGRESSION REPORT (Last {hours} hours)")
         print("=" * 110)
         
         # 2. Calculer le gain de followers total sur la période
-        # On récupère le point le plus proche du début et de la fin
-        f_start = conn.execute("""
-            SELECT follower_count FROM follower_events 
-            WHERE collected_at >= ? ORDER BY collected_at ASC LIMIT 1
+        # Recherche par proximité temporelle (point le plus proche)
+        f_start_result = conn.execute("""
+            SELECT follower_count, collected_at FROM follower_events 
+            ORDER BY ABS(strftime('%s', collected_at) - strftime('%s', ?)) ASC LIMIT 1
         """, (start_time.isoformat(),)).fetchone()
         
-        f_end = conn.execute("""
-            SELECT follower_count FROM follower_events 
-            WHERE collected_at <= ? ORDER BY collected_at DESC LIMIT 1
+        f_end_result = conn.execute("""
+            SELECT follower_count, collected_at FROM follower_events 
+            ORDER BY ABS(strftime('%s', collected_at) - strftime('%s', ?)) ASC LIMIT 1
         """, (end_time.isoformat(),)).fetchone()
         
-        if not f_start or not f_end:
-            print("❌ Données de followers insuffisantes.")
+        if not f_start_result or not f_end_result:
+            print("❌ Besoin d'au moins deux collectes pour calculer une progression.")
             return
-
+        
+        # Vérifier que ce ne sont pas les mêmes points (besoin de 2 collectes distinctes)
+        if f_start_result['collected_at'] == f_end_result['collected_at']:
+            print("❌ Besoin d'au moins deux collectes pour calculer une progression.")
+            return
+        
+        # Vérifier la tolérance de 30 minutes pour le point de départ
+        f_start_time = datetime.fromisoformat(f_start_result['collected_at'].replace('Z', '+00:00').replace(' ', 'T')).replace(tzinfo=None)
+        f_end_time = datetime.fromisoformat(f_end_result['collected_at'].replace('Z', '+00:00').replace(' ', 'T')).replace(tzinfo=None)
+        
+        start_delta = abs((f_start_time - start_time).total_seconds() / 60)  # en minutes
+        end_delta = abs((f_end_time - end_time).total_seconds() / 60)
+        
+        if start_delta > 30:
+            print(f"⚠️ Point de départ trouvé à {start_delta:.0f} min de la cible (tolérance: 30 min)")
+        if end_delta > 30:
+            print(f"⚠️ Point de fin trouvé à {end_delta:.0f} min de la cible (tolérance: 30 min)")
+        
+        # Calculer l'intervalle réel analysé
+        actual_interval = f_end_time - f_start_time
+        actual_hours = actual_interval.total_seconds() / 3600
+        actual_minutes = (actual_interval.total_seconds() % 3600) / 60
+        
+        f_start = f_start_result
+        f_end = f_end_result
         total_gain = f_end['follower_count'] - f_start['follower_count']
         
         if total_gain <= 0:
-            print(f"ℹ️ Aucun gain de followers sur les {days} derniers jours.")
+            print(f"ℹ️ Aucun gain de followers sur les {hours} dernières heures.")
             return
 
         # 3. Calculer les vues gagnées par CHAQUE article sur la période
@@ -157,18 +181,18 @@ class AdvancedAnalytics:
         global_traffic_gain = 0
         
         for art in articles:
-            # Vues au début de la fenêtre
+            # Vues au début de la fenêtre (recherche par proximité)
             v_start = conn.execute("""
                 SELECT views FROM article_metrics 
-                WHERE article_id = ? AND collected_at >= ? 
-                ORDER BY collected_at ASC LIMIT 1
+                WHERE article_id = ?
+                ORDER BY ABS(strftime('%s', collected_at) - strftime('%s', ?)) ASC LIMIT 1
             """, (art['article_id'], start_time.isoformat())).fetchone()
             
-            # Vues à la fin
+            # Vues à la fin (recherche par proximité)
             v_end = conn.execute("""
                 SELECT views FROM article_metrics 
-                WHERE article_id = ? AND collected_at <= ? 
-                ORDER BY collected_at DESC LIMIT 1
+                WHERE article_id = ?
+                ORDER BY ABS(strftime('%s', collected_at) - strftime('%s', ?)) ASC LIMIT 1
             """, (art['article_id'], end_time.isoformat())).fetchone()
             
             if v_start and v_end:
@@ -186,6 +210,7 @@ class AdvancedAnalytics:
 
         # 4. Affichage du rapport pondéré
         print(f"Total Gain: +{total_gain} followers | Total Traffic: {global_traffic_gain} views")
+        print(f"Intervalle réel : {int(actual_hours)}h{int(actual_minutes)}m")
         print("-" * 110)
         print(f"{'Article':<50} {'Views':>12} {'Traffic %':>12} {'Followers':>15}")
         print("-" * 110)
@@ -201,20 +226,21 @@ class AdvancedAnalytics:
             title = (item['title'][:47] + "...") if len(item['title']) > 50 else item['title']
             print(f"{title:<50} {item['views_gain']:>12,} {share:>11.1%} {attributed_followers:>15.1f}")
 
-    def full_report(self):
+    def full_report(self, hours=168):
         print("\n" + "=" * 110)
         print(" " * 38 + "📊 ADVANCED ANALYTICS REPORT")
         print("=" * 110)
         self.article_follower_correlation()
         self.comment_engagement_correlation()
         self.velocity_milestone_correlation()
-        self.weighted_follower_attribution(days=7)
+        self.weighted_follower_attribution(hours=hours)
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', default='devto_metrics.db')
+    parser.add_argument('--hours', type=int, default=168, help='Période d\'analyse en heures (défaut: 168 = 7 jours)')
     args = parser.parse_args()
-    AdvancedAnalytics(args.db).full_report()
+    AdvancedAnalytics(args.db).full_report(hours=args.hours)
 
 if __name__ == "__main__":
     main()
