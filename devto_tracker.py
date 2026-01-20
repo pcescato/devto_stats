@@ -98,6 +98,12 @@ class DevToTracker:
         
         print(f"✅ Rich analytics collection complete.")
 
+    def collect_all(self):
+        """Run full collection (metrics+followers+comments) then rich analytics."""
+        # collect_full inclut collect_snapshot
+        self.collect_full()
+        self.collect_rich_analytics()
+
     def _collect_followers(self, timestamp):
         """Récupère le compte précis des followers avec pagination."""
         print(f"👥 Collecting followers...")
@@ -238,6 +244,8 @@ def main():
                        help='Full collection (metrics + followers + comments)')
     parser.add_argument('--rich', action='store_true',
                        help='Rich analytics (historical data + referrers)')
+    parser.add_argument('--all', action='store_true',
+                        help='Run full collection then rich analytics (everything)')
     args = parser.parse_args()
 
     api_key = os.getenv('DEVTO_API_KEY')
@@ -253,6 +261,8 @@ def main():
         tracker.collect_full()
     elif args.rich:
         tracker.collect_rich_analytics()
+    elif args.all:
+        tracker.collect_all()
     else:
         parser.print_help()
 
