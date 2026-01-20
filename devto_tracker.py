@@ -154,6 +154,7 @@ class DevToTracker:
             if r.status_code == 200:
                 for c in r.json():
                     body_text = c.get('body_html', '')
+                    user = c.get('user', {})
                     cursor = conn.execute("""
                         INSERT OR IGNORE INTO comments 
                         (comment_id, article_id, article_title, author_username, author_name, 
@@ -161,7 +162,7 @@ class DevToTracker:
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         c['id_code'], art['id'], art['title'],
-                        c['user']['username'], c['user']['name'],
+                        user.get('username'), user.get('name'),
                         body_text, len(body_text), c['created_at'], timestamp
                     ))
                     if cursor.rowcount > 0:
