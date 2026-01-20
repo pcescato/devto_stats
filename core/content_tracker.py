@@ -10,7 +10,6 @@ import json
 import time
 from datetime import datetime, timezone, timedelta
 from core.database import DatabaseManager
-from core.content_tracker import ContentTracker
 
 class DevToTracker:
     def __init__(self, api_key: str, db_path: str = "devto_metrics.db"):
